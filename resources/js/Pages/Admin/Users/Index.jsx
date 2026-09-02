@@ -21,7 +21,7 @@ import {
 
 import ConfirmDeleteModal from "@/Components/ConfirmDeleteModal";
 
-export default function UserIndex({ users, roles, filters }) {
+export default function UserIndex({ users, roles, branches, filters }) {
     const [searchTerm, setSearchTerm] = useState(filters?.search || "");
     const [perPage, setPerPage] = useState(filters?.per_page || 10);
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -38,6 +38,7 @@ export default function UserIndex({ users, roles, filters }) {
             email: "",
             password: "",
             roles: [],
+            branch_ids: [],
         });
 
     useEffect(() => {
@@ -60,6 +61,7 @@ export default function UserIndex({ users, roles, filters }) {
                 email: user.email || "",
                 password: "",
                 roles: user.roles ? user.roles.map((r) => typeof r === 'string' ? r : r.name) : [],
+                branch_ids: user.branch_ids || [],
             });
         } else {
             setEditingUser(null);
@@ -437,6 +439,19 @@ export default function UserIndex({ users, roles, filters }) {
                                             </label>
                                         ))}
                                     </div>
+                                </div>
+
+                                <div className="md:col-span-2">
+                                    <label className="block text-sm font-semibold text-slate-700 mb-1.5">Assign Branches</label>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 rounded-lg border border-slate-200 p-4 bg-slate-50/50">
+                                        {branches.map((branch) => (
+                                            <label key={branch.id} className="flex items-center gap-2.5 text-sm text-slate-700 cursor-pointer">
+                                                <input type="checkbox" checked={data.branch_ids.includes(branch.id)} onChange={(e) => setData("branch_ids", e.target.checked ? [...data.branch_ids, branch.id] : data.branch_ids.filter((id) => id !== branch.id))} className="w-4 h-4 rounded border-slate-300 text-amber-500" />
+                                                {branch.name} ({branch.code})
+                                            </label>
+                                        ))}
+                                    </div>
+                                    {errors.branch_ids && <p className="mt-1 text-xs text-red-500">{errors.branch_ids}</p>}
                                 </div>
                             </div>
 

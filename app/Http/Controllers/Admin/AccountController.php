@@ -4,7 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
+use App\Support\BranchDB as DB;
 use App\Models\Account;
 use Inertia\Inertia;
 
@@ -92,6 +92,7 @@ class AccountController extends Controller
         ]);
 
         DB::table('accounts')->insert([
+            'branch_id' => auth()->user()->active_branch_id,
             'name' => $request->name,
             'type' => $request->type,
             'account_number' => $request->account_number,

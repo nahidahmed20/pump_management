@@ -4,7 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
+use App\Support\BranchDB as DB;
 use Inertia\Inertia;
 
 class StockAdjustmentController extends Controller
@@ -75,6 +75,7 @@ class StockAdjustmentController extends Controller
         DB::beginTransaction();
         try {
             DB::table('stock_adjustments')->insert([
+                'branch_id' => auth()->user()->active_branch_id,
                 'date' => $request->date,
                 'product_id' => $request->product_id,
                 'type' => $request->type,

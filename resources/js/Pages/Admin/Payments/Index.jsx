@@ -150,7 +150,7 @@ export default function PaymentIndex({ payments, accounts, parties, filters }) {
                         <tbody className="divide-y divide-slate-50">
                             {payments.data.length > 0 ? (
                                 payments.data.map((p) => {
-                                    const isReceive = ['invoice_receive', 'due_receive'].includes(p.payment_type);
+                                    const isReceive = p.payment_type === 'due_receive';
                                     return (
                                         <tr key={p.id} className="hover:bg-slate-50/50 group">
                                             <td className="px-6 py-4 font-semibold text-slate-700">{p.date}</td>
@@ -214,7 +214,7 @@ export default function PaymentIndex({ payments, accounts, parties, filters }) {
                                     <label className="mb-1.5 block text-sm font-bold text-slate-700">Select Party (Customer/Supplier) <span className="text-rose-500">*</span></label>
                                     <select value={data.party_id} onChange={e => setData('party_id', e.target.value)} required className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 text-sm outline-none focus:border-amber-500">
                                         <option value="">-- Choose Party --</option>
-                                        {parties.map(p => <option key={p.id} value={p.id}>{p.name} ({p.type}) - Due: {p.current_balance}</option>)}
+                                        {parties.filter(p => data.payment_type === 'due_receive' ? p.type === 'customer' : p.type === 'supplier').map(p => <option key={p.id} value={p.id}>{p.name} ({p.type}) - Due: {p.current_balance}</option>)}
                                     </select>
                                 </div>
                                 <div>

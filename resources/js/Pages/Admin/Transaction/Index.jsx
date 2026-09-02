@@ -323,8 +323,6 @@ export default function TransactionIndex({ transactions, accounts, parties, user
                                         <option value="payment_out">Payment Out (Pay Supplier/Expense)</option>
                                         <option value="transfer">Bank Transfer / Deposit</option>
                                         <option value="salary">Staff Salary / Advance</option>
-                                        <option value="loan_received">Loan Received (ধার নেওয়া)</option>
-                                        <option value="loan_repayment">Loan Repayment (ধার শোধ)</option>
                                     </select>
                                 </div>
 

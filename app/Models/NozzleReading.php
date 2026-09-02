@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class NozzleReading extends Model
 {
-    use HasFactory, SoftDeletes;
+    use HasFactory, SoftDeletes, Concerns\BelongsToBranch;
 
     protected $guarded = ['id'];
 

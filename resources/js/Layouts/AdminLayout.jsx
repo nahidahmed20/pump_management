@@ -9,44 +9,45 @@ import {
 
 const MENU = [
     {
-        id: "dashboard", label: "Dashboard", icon: LayoutDashboard, permission: "dashboard.view", href: "/"
+        id: "dashboard", label: "Dashboard", icon: LayoutDashboard, permission: "dashboard.view", href: "/dashboard"
     },
     {
-        id: "master-setup", label: "Master Setup", icon: Settings, permission: "setup.view",
+        id: "master-setup", label: "Master Setup", icon: Settings, permission: "products.manage",
         children: [
             { label: "System Settings", href: "/admin/settings" },
             { label: "Categories", href: "/admin/categories" },
-            { label: "Products (Fuel/Lube)", href: "/admin/products", permission: "products.view" },
+            { label: "Products (Fuel/Lube)", href: "/admin/products", permission: "products.manage" },
             { label: "Tanks", href: "/admin/tanks" },
             { label: "Nozzles", href: "/admin/nozzles" },
-            { label: "Fuel Price Update", href: "/admin/fuel-prices", permission: "products.view" },
+            { label: "Fuel Price Update", href: "/admin/fuel-prices", permission: "fuel-prices.manage" },
         ],
     },
     {
-        id: "finance", label: "Accounts & Finance", icon: Wallet, permission: "accounts.view",
+        id: "finance", label: "Accounts & Finance", icon: Wallet, permission: "accounts.manage",
         children: [
             { label: "Parties (Customer/Supplier)", href: "/admin/parties" },
             { label: "Accounts (Bank/Cash)", href: "/admin/accounts" },
             { label: "Payments (Receive/Pay)", href: "/admin/payments" },
             { label: "Daily Expenses", href: "/admin/expenses" },
             { label: "Transactions", href: "/admin/transactions" },
+            { label: "Loans & Repayments", href: "/admin/loans", permission: "loans.manage" },
         ],
     },
     {
-        id: "purchase", label: "Purchases", icon: PackagePlus, permission: "purchases.view",
+        id: "purchase", label: "Purchases", icon: PackagePlus, permission: "purchases.manage",
         children: [
             { label: "New Purchase", href: "/admin/purchases/create" },
             { label: "Purchase History", href: "/admin/purchases" },
         ],
     },
     {
-        id: "inventory", label: "Inventory & Stock", icon: Boxes, permission: "products.view",
+        id: "inventory", label: "Inventory & Stock", icon: Boxes, permission: "stock-adjustments.manage",
         children: [
             { label: "Stock Adjustment", href: "/admin/stock-adjustments" },
         ],
     },
     {
-        id: "daily-operations", label: "Daily Operations", icon: Activity, permission: "shifts.view",
+        id: "daily-operations", label: "Daily Operations", icon: Activity, permission: "shifts.manage",
         children: [
             { label: "Shift Management", href: "/admin/shifts" },
             { label: "Tank Dip Reading", href: "/admin/tank-readings" },
@@ -54,7 +55,7 @@ const MENU = [
         ],
     },
     {
-        id: "sales", label: "Sales & POS", icon: ShoppingCart, permission: "invoices.view",
+        id: "sales", label: "Sales & POS", icon: ShoppingCart, permission: "invoices.manage",
         children: [
             { label: "New Sale / POS", href: "/admin/invoices/create" },
             { label: "All Invoices", href: "/admin/invoices" },
@@ -75,11 +76,12 @@ const MENU = [
         ],
     },
     {
-        id: "user-management", label: "User Management", icon: ShieldCheck, permission: "users.view",
+        id: "user-management", label: "User Management", icon: ShieldCheck, permission: "users.manage",
         children: [
             { label: "Users", href: "/admin/users" },
             { label: "Roles", href: "/admin/roles" },
             { label: "Permissions", href: "/admin/permissions" },
+            { label: "Branches", href: "/admin/branches", permission: "branches.manage" },
         ],
     },
 ];
@@ -120,7 +122,7 @@ export default function AdminLayout({ children, title, icon: TitleIcon }) {
     }, []);
 
     const isActive = (href) => {
-        if (href === "/") return currentPath === "/";
+        if (href === "/dashboard") return currentPath === "/dashboard";
         if (currentPath === href) return true;
         if (allMenuHrefs.includes(currentPath)) return false;
         return currentPath.startsWith(href + "/");
@@ -199,7 +201,7 @@ export default function AdminLayout({ children, title, icon: TitleIcon }) {
             >
                 {/* Brand Header */}
                 <div className="flex h-[72px] shrink-0 items-center justify-between px-5 border-b border-white/[0.04] bg-slate-950/50">
-                    <Link href="/" className="flex items-center gap-3 min-w-0 rounded-lg focus:outline-none">
+                    <Link href="/dashboard" className="flex items-center gap-3 min-w-0 rounded-lg focus:outline-none">
                         <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-amber-400 to-amber-600 shadow-lg shadow-amber-500/20">
                             <Fuel size={20} className="text-slate-900" strokeWidth={2.5} />
                         </div>
@@ -209,7 +211,7 @@ export default function AdminLayout({ children, title, icon: TitleIcon }) {
                                     FuelDesk ERP
                                 </p>
                                 <p className="truncate text-[12px] font-medium text-slate-400">
-                                    Surma Filling Station
+                                    {auth.user?.active_branch?.name || "Fuel Station"}
                                 </p>
                             </div>
                         )}
@@ -347,6 +349,16 @@ export default function AdminLayout({ children, title, icon: TitleIcon }) {
 
                     {/* Right Actions */}
                     <div className="flex shrink-0 items-center gap-3 sm:gap-5">
+                        {(auth.branches || []).length > 0 && (
+                            <select
+                                value={auth.user?.active_branch_id || ""}
+                                onChange={(e) => router.post("/branch/switch", { branch_id: Number(e.target.value) }, { preserveScroll: true })}
+                                className="hidden sm:block h-10 max-w-48 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 focus:border-amber-500 focus:ring-amber-500"
+                                aria-label="Active branch"
+                            >
+                                {(auth.branches || []).map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}
+                            </select>
+                        )}
                         <div className="hidden md:block w-56 lg:w-80">
                             <GlobalSearch />
                         </div>

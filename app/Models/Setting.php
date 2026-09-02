@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class Setting extends Model
 {
-    use HasFactory;
+    use HasFactory, Concerns\BelongsToBranch;
 
     protected $guarded = ['id'];
 }

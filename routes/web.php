@@ -24,6 +24,8 @@ use App\Http\Controllers\Admin\ReportController;
 use App\Http\Controllers\Admin\GlobalSearchController;
 use App\Http\Controllers\Admin\TankReadingController;
 use App\Http\Controllers\Admin\PaymentController;
+use App\Http\Controllers\Admin\BranchController;
+use App\Http\Controllers\Admin\LoanController;
 use App\Http\Controllers\ProfileController;
 use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Route;
@@ -34,7 +36,7 @@ Route::get('/', function () {
 });
 
 Route::get('/dashboard', [DashboardController::class, 'index'])
-    ->middleware(['auth', 'verified'])
+    ->middleware(['auth', 'verified', 'branch', 'permission:dashboard.view'])
     ->name('dashboard');
 
 Route::middleware('auth')->group(function () {
@@ -42,36 +44,42 @@ Route::middleware('auth')->group(function () {
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 
-    Route::prefix('admin')->name('admin.')->group(function () {
-        Route::resource('users', UserController::class);
-        Route::resource('roles', RoleController::class);
-        Route::resource('permissions', PermissionController::class);
-        Route::resource('categories', CategoryController::class);
-        Route::resource('products', ProductController::class);
-        Route::resource('tanks', TankController::class);
-        Route::resource('nozzles', NozzleController::class);
-        Route::post('/shifts/{shift}/close', [ShiftController::class, 'closeShift'])->name('shifts.close');
-        Route::resource('shifts', ShiftController::class);
-        Route::resource('nozzle-readings', NozzleReadingController::class);
-        Route::resource('invoices', InvoiceController::class);
-        Route::resource('purchases', PurchaseController::class);
-        Route::resource('parties', PartyController::class);
-        Route::resource('expenses', ExpenseController::class);
-        Route::resource('accounts', AccountController::class);
-        Route::resource('transactions', TransactionController::class);
-        Route::resource('stock-adjustments', StockAdjustmentController::class);
-        Route::get('settings', [SettingController::class, 'index'])->name('settings.index');
-        Route::put('settings', [SettingController::class, 'update'])->name('settings.update');
+    Route::post('/branch/switch', [BranchController::class, 'switch'])->middleware('branch')->name('branch.switch');
 
-        Route::get('/fuel-prices', [FuelPriceController::class, 'index'])->name('fuel-prices.index');
-        Route::post('/fuel-prices', [FuelPriceController::class, 'update'])->name('fuel-prices.update');
-        Route::get('stock-ledgers', [StockLedgerController::class, 'index'])->name('stock-ledgers.index');
-        Route::get('/global-search', [GlobalSearchController::class, 'search'])->name('global.search');
+    Route::prefix('admin')->name('admin.')->middleware(['branch', 'period.open', 'audit'])->group(function () {
+        Route::resource('branches', BranchController::class)->except(['create', 'show', 'edit'])->middleware('permission:branches.manage');
+        Route::resource('users', UserController::class)->middleware('permission:users.manage');
+        Route::resource('roles', RoleController::class)->middleware('permission:roles.manage');
+        Route::resource('permissions', PermissionController::class)->middleware('permission:permissions.manage');
+        Route::resource('categories', CategoryController::class)->middleware('permission:categories.manage');
+        Route::resource('products', ProductController::class)->middleware('permission:products.manage');
+        Route::resource('tanks', TankController::class)->middleware('permission:tanks.manage');
+        Route::resource('nozzles', NozzleController::class)->middleware('permission:nozzles.manage');
+        Route::post('/shifts/{shift}/close', [ShiftController::class, 'closeShift'])->middleware('permission:shifts.manage')->name('shifts.close');
+        Route::resource('shifts', ShiftController::class)->middleware('permission:shifts.manage');
+        Route::resource('nozzle-readings', NozzleReadingController::class)->middleware('permission:nozzle-readings.manage');
+        Route::resource('invoices', InvoiceController::class)->middleware('permission:invoices.manage');
+        Route::resource('purchases', PurchaseController::class)->middleware('permission:purchases.manage');
+        Route::resource('parties', PartyController::class)->middleware('permission:parties.manage');
+        Route::resource('expenses', ExpenseController::class)->middleware('permission:expenses.manage');
+        Route::resource('accounts', AccountController::class)->middleware('permission:accounts.manage');
+        Route::resource('transactions', TransactionController::class)->middleware('permission:transactions.manage');
+        Route::resource('stock-adjustments', StockAdjustmentController::class)->middleware('permission:stock-adjustments.manage');
+        Route::get('settings', [SettingController::class, 'index'])->middleware('permission:settings.manage')->name('settings.index');
+        Route::put('settings', [SettingController::class, 'update'])->middleware('permission:settings.manage')->name('settings.update');
 
-        Route::resource('tank-readings', TankReadingController::class);
-        Route::resource('payments', PaymentController::class);
+        Route::get('/fuel-prices', [FuelPriceController::class, 'index'])->middleware('permission:fuel-prices.manage')->name('fuel-prices.index');
+        Route::post('/fuel-prices', [FuelPriceController::class, 'update'])->middleware('permission:fuel-prices.manage')->name('fuel-prices.update');
+        Route::get('stock-ledgers', [StockLedgerController::class, 'index'])->middleware('permission:stock-ledgers.view')->name('stock-ledgers.index');
+        Route::get('/global-search', [GlobalSearchController::class, 'search'])->middleware('permission:dashboard.view')->name('global.search');
 
-        Route::prefix('reports')->name('reports.')->group(function () {
+        Route::resource('tank-readings', TankReadingController::class)->middleware('permission:tank-readings.manage');
+        Route::resource('payments', PaymentController::class)->middleware('permission:payments.manage');
+        Route::post('loans/{loan}/repay', [LoanController::class, 'repay'])->middleware('permission:loans.manage')->name('loans.repay');
+        Route::delete('loan-repayments/{repayment}', [LoanController::class, 'destroyRepayment'])->middleware('permission:loans.manage')->name('loan-repayments.destroy');
+        Route::resource('loans', LoanController::class)->only(['index', 'store', 'destroy'])->middleware('permission:loans.manage');
+
+        Route::prefix('reports')->name('reports.')->middleware('permission:reports.view')->group(function () {
             Route::get('/purchases', [ReportController::class, 'purchaseReport'])->name('purchases');
             Route::get('/sales', [ReportController::class, 'salesReport'])->name('sales');
             Route::get('/profit-loss', [ReportController::class, 'profitLossReport'])->name('profit_loss');

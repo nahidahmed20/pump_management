@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Payment extends Model
 {
-    use SoftDeletes;
+    use SoftDeletes, Concerns\BelongsToBranch;
 
     protected $guarded = ['id']; 
 
@@ -29,5 +29,10 @@ class Payment extends Model
     public function purchase()
     {
         return $this->belongsTo(Purchase::class, 'reference_id');
+    }
+
+    public function allocations()
+    {
+        return $this->hasMany(PaymentAllocation::class);
     }
 }

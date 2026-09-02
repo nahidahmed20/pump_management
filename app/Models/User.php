@@ -24,6 +24,7 @@ class User extends Authenticatable
         'name',
         'email',
         'password',
+        'active_branch_id',
     ];
 
     /**
@@ -47,5 +48,15 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
         ];
+    }
+
+    public function branches()
+    {
+        return $this->belongsToMany(Branch::class);
+    }
+
+    public function activeBranch()
+    {
+        return $this->belongsTo(Branch::class, 'active_branch_id');
     }
 }

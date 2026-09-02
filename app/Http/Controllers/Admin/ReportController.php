@@ -4,7 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
+use App\Support\BranchDB as DB;
 use Inertia\Inertia;
 use Carbon\Carbon;
 
@@ -114,6 +114,11 @@ class ReportController extends Controller
         if ($endDate) $purchaseQuery->whereDate('date', '<=', $endDate);
         $totalPurchases = $purchaseQuery->sum('grand_total');
 
+        $cogsQuery = DB::table('invoice_items')->join('invoices', 'invoice_items.invoice_id', '=', 'invoices.id');
+        if ($startDate) $cogsQuery->whereDate('invoices.date', '>=', $startDate);
+        if ($endDate) $cogsQuery->whereDate('invoices.date', '<=', $endDate);
+        $totalCogs = $cogsQuery->sum(DB::raw('invoice_items.quantity * invoice_items.cost_price'));
+
         // ৩. Stock Adjustment (Shortage/Surplus) Calculation
         $latestPriceQuery = "(SELECT unit_price FROM purchase_items WHERE purchase_items.product_id = stock_adjustments.product_id ORDER BY id DESC LIMIT 1)";
         $adjQuery = DB::table('stock_adjustments')
@@ -128,18 +133,19 @@ class ReportController extends Controller
         $totalSurplus = $adjValues['surplus'] ?? 0;
 
         // ৪. Operating Expenses Calculation (age eta missing chilo!)
-        $expenseQuery = DB::table('transactions')->where('type', 'expense');
+        $expenseQuery = DB::table('expenses');
         if ($startDate) $expenseQuery->whereDate('date', '>=', $startDate);
         if ($endDate) $expenseQuery->whereDate('date', '<=', $endDate);
         $totalExpenses = $expenseQuery->sum('amount');
 
-        $grossProfit = $totalSales - $totalPurchases;
+        $grossProfit = $totalSales - $totalCogs;
         $netProfit = $grossProfit + $totalSurplus - $totalShortage - $totalExpenses;
 
         return Inertia::render('Admin/Reports/ProfitLossReport', [
             'summary' => [
                 'total_sales' => $totalSales,
                 'total_purchases' => $totalPurchases,
+                'total_cogs' => $totalCogs,
                 'total_shortage' => $totalShortage,
                 'total_surplus' => $totalSurplus,
                 'total_expenses' => $totalExpenses,
@@ -240,8 +246,7 @@ class ReportController extends Controller
             'end_date' => 'nullable|date|after_or_equal:start_date',
         ]);
 
-        $query = DB::table('transactions')
-            ->where('type', 'expense');
+        $query = DB::table('expenses');
 
         if ($request->filled('start_date')) {
             $query->whereDate('date', '>=', $request->start_date);
@@ -282,11 +287,11 @@ class ReportController extends Controller
 
         $cashSales = DB::table('invoices')->whereDate('date', $date)->sum('paid_amount');
 
-        $collections = DB::table('transactions')->whereDate('date', $date)->where('type', 'income')->sum('amount');
+        $collections = DB::table('payments')->whereDate('date', $date)->where('payment_type', 'due_receive')->sum('amount');
 
-        $expenses = DB::table('transactions')->whereDate('date', $date)->where('type', 'expense')->sum('amount');
+        $expenses = DB::table('expenses')->whereDate('date', $date)->sum('amount');
 
-        $supplierPayments = DB::table('transactions')->whereDate('date', $date)->where('type', 'supplier_payment')->sum('amount');
+        $supplierPayments = DB::table('payments')->whereDate('date', $date)->where('payment_type', 'purchase_pay')->sum('amount');
 
         $netCashInHand = ($cashSales + $collections) - ($expenses + $supplierPayments);
 

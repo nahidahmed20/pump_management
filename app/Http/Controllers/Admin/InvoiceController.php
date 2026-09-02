@@ -13,9 +13,10 @@ use App\Models\Tank;
 use App\Models\Account;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
+use App\Support\BranchDB as DB;
 use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
+use App\Services\InventoryService;
 
 class InvoiceController extends Controller
 {
@@ -68,10 +69,17 @@ class InvoiceController extends Controller
             'discount'              => 'nullable|numeric|min:0',
             'grand_total'           => 'required|numeric|min:0',
             'cart'                  => 'required|array|min:1',
+            'cart.*.id'             => 'required|integer|exists:products,id',
+            'cart.*.quantity'       => 'required|numeric|gt:0',
+            'cart.*.unit_price'     => 'required|numeric|min:0',
             'payments'              => 'required|array',
             'payments.*.account_id' => 'nullable|exists:accounts,id',
             'payments.*.amount'     => 'nullable|numeric|min:0',
         ]);
+
+        $serverSubTotal = collect($request->cart)->sum(fn ($item) => round((float) $item['quantity'] * (float) $item['unit_price'], 3));
+        $serverDiscount = min((float) ($request->discount ?? 0), $serverSubTotal);
+        $request->merge(['sub_total' => $serverSubTotal, 'discount' => $serverDiscount, 'grand_total' => $serverSubTotal - $serverDiscount]);
 
         $openShift = Shift::where('status', 'open')->first();
 
@@ -96,6 +104,10 @@ class InvoiceController extends Controller
             }
         }
 
+        if ($totalPaid > (float) $request->grand_total) {
+            return back()->withErrors(['payments' => 'Paid amount cannot exceed invoice total.']);
+        }
+
         // Verify Account Balances
         foreach ($accountPayments as $accId => $amount) {
             $account = Account::find($accId);
@@ -105,6 +117,16 @@ class InvoiceController extends Controller
         }
 
         $due_amount = max(0, $request->grand_total - $totalPaid);
+        if ($due_amount > 0 && !$request->customer_id) {
+            return back()->withErrors(['customer_id' => 'A customer is required for a credit sale.']);
+        }
+
+        foreach ($request->cart as $item) {
+            $product = Product::find($item['id'] ?? null);
+            if (!$product || (float) $item['quantity'] <= 0 || $product->current_stock < (float) $item['quantity']) {
+                return back()->withErrors(['cart' => 'Insufficient stock or invalid product in the cart.']);
+            }
+        }
 
         try {
             DB::beginTransaction();
@@ -135,6 +157,7 @@ class InvoiceController extends Controller
                 Account::where('id', $accId)->increment('current_balance', $amount);
 
                 DB::table('transactions')->insert([
+                    'branch_id'      => auth()->user()->active_branch_id,
                     'voucher_no'     => $invoice->invoice_no,
                     'date'           => now(),
                     'type'           => 'payment_in',
@@ -152,54 +175,7 @@ class InvoiceController extends Controller
                 Party::where('id', $request->customer_id)->increment('current_balance', $due_amount);
             }
 
-            foreach ($request->cart as $item) {
-                InvoiceItem::create([
-                    'invoice_id'  => $invoice->id,
-                    'product_id'  => $item['id'],
-                    'quantity'    => $item['quantity'],
-                    'unit_price'  => $item['unit_price'],
-                    'total_price' => $item['total_price'],
-                ]);
-
-                $product = Product::find($item['id']);
-                if ($product && \Schema::hasColumn('products', 'current_stock')) {
-                    $product->decrement('current_stock', $item['quantity']);
-                }
-
-                $qtyToDeduct = (float) $item['quantity'];
-                $tanks = Tank::where('product_id', $product->id)->get();
-
-                foreach ($tanks as $tank) {
-                    if ($qtyToDeduct <= 0) break;
-
-                    if ($tank->current_stock >= $qtyToDeduct) {
-                        $tank->decrement('current_stock', $qtyToDeduct);
-                        $qtyToDeduct = 0;
-                    } else {
-                        $deduct = $tank->current_stock > 0 ? $tank->current_stock : 0;
-                        if ($deduct > 0) {
-                            $tank->decrement('current_stock', $deduct);
-                            $qtyToDeduct -= $deduct;
-                        }
-                    }
-                }
-
-                if ($qtyToDeduct > 0) {
-                    $firstTank = Tank::where('product_id', $product->id)->first();
-                    if ($firstTank) {
-                        $firstTank->decrement('current_stock', $qtyToDeduct);
-                    }
-                }
-
-                StockLedger::create([
-                    'product_id' => $product->id,
-                    'type'       => 'out',
-                    'quantity'   => $item['quantity'],
-                    'source'     => 'pos_sale',
-                    'source_id'  => $invoice->id,
-                    'date'       => now(),
-                ]);
-            }
+            foreach ($request->cart as $item) app(InventoryService::class)->addSaleItem($invoice, $item);
 
             if ($openShift) {
                 $openShift->increment('total_sales', $request->grand_total);
@@ -258,10 +234,17 @@ class InvoiceController extends Controller
             'discount'              => 'nullable|numeric|min:0',
             'grand_total'           => 'required|numeric|min:0',
             'cart'                  => 'required|array|min:1',
+            'cart.*.id'             => 'required|integer|exists:products,id',
+            'cart.*.quantity'       => 'required|numeric|gt:0',
+            'cart.*.unit_price'     => 'required|numeric|min:0',
             'payments'              => 'required|array',
             'payments.*.account_id' => 'nullable|exists:accounts,id',
             'payments.*.amount'     => 'nullable|numeric|min:0',
         ]);
+
+        $serverSubTotal = collect($request->cart)->sum(fn ($item) => round((float) $item['quantity'] * (float) $item['unit_price'], 3));
+        $serverDiscount = min((float) ($request->discount ?? 0), $serverSubTotal);
+        $request->merge(['sub_total' => $serverSubTotal, 'discount' => $serverDiscount, 'grand_total' => $serverSubTotal - $serverDiscount]);
 
         $invoice = Invoice::with('items')->findOrFail($id);
 
@@ -312,16 +295,7 @@ class InvoiceController extends Controller
             }
 
             // 4. REVERSE OLD STOCK & LEDGER
-            foreach ($invoice->items as $item) {
-                Product::where('id', $item->product_id)->increment('current_stock', $item->quantity);
-
-                $firstTank = Tank::where('product_id', $item->product_id)->first();
-                if ($firstTank) {
-                    $firstTank->increment('current_stock', $item->quantity);
-                }
-            }
-            StockLedger::where('source', 'pos_sale')->where('source_id', $invoice->id)->delete();
-            $invoice->items()->delete();
+            app(InventoryService::class)->reverseSale($invoice);
 
             // 5. APPLY NEW DATA
             $newDue = max(0, $request->grand_total - $totalPaid);
@@ -340,6 +314,7 @@ class InvoiceController extends Controller
                 Account::where('id', $accId)->increment('current_balance', $amount);
 
                 DB::table('transactions')->insert([
+                    'branch_id'      => auth()->user()->active_branch_id,
                     'voucher_no'     => $invoice->invoice_no,
                     'date'           => now(),
                     'type'           => 'payment_in',
@@ -359,54 +334,7 @@ class InvoiceController extends Controller
             }
 
             // APPLY NEW STOCK
-            foreach ($request->cart as $item) {
-                InvoiceItem::create([
-                    'invoice_id'  => $invoice->id,
-                    'product_id'  => $item['id'],
-                    'quantity'    => $item['quantity'],
-                    'unit_price'  => $item['unit_price'],
-                    'total_price' => $item['total_price'],
-                ]);
-
-                $product = Product::find($item['id']);
-                if ($product && \Schema::hasColumn('products', 'current_stock')) {
-                    $product->decrement('current_stock', $item['quantity']);
-                }
-
-                $qtyToDeduct = (float) $item['quantity'];
-                $tanks = Tank::where('product_id', $product->id)->get();
-
-                foreach ($tanks as $tank) {
-                    if ($qtyToDeduct <= 0) break;
-
-                    if ($tank->current_stock >= $qtyToDeduct) {
-                        $tank->decrement('current_stock', $qtyToDeduct);
-                        $qtyToDeduct = 0;
-                    } else {
-                        $deduct = $tank->current_stock > 0 ? $tank->current_stock : 0;
-                        if ($deduct > 0) {
-                            $tank->decrement('current_stock', $deduct);
-                            $qtyToDeduct -= $deduct;
-                        }
-                    }
-                }
-
-                if ($qtyToDeduct > 0) {
-                    $firstTank = Tank::where('product_id', $product->id)->first();
-                    if ($firstTank) {
-                        $firstTank->decrement('current_stock', $qtyToDeduct);
-                    }
-                }
-
-                StockLedger::create([
-                    'product_id' => $product->id,
-                    'type'       => 'out',
-                    'quantity'   => $item['quantity'],
-                    'source'     => 'pos_sale',
-                    'source_id'  => $invoice->id,
-                    'date'       => now(),
-                ]);
-            }
+            foreach ($request->cart as $item) app(InventoryService::class)->addSaleItem($invoice, $item);
 
             $openShift = Shift::where('status', 'open')->first();
             if ($openShift) {
@@ -452,19 +380,9 @@ class InvoiceController extends Controller
                 }
             }
 
-            foreach ($invoice->items as $item) {
-                Product::where('id', $item->product_id)->increment('current_stock', $item['quantity']);
-
-                $firstTank = Tank::where('product_id', $item->product_id)->first();
-                if ($firstTank) {
-                    $firstTank->increment('current_stock', $item->quantity);
-                }
-            }
-
-            StockLedger::where('source', 'pos_sale')->where('source_id', $invoice->id)->delete();
+            app(InventoryService::class)->reverseSale($invoice);
             DB::table('transactions')->where('voucher_no', $invoice->invoice_no)->delete();
 
-            $invoice->items()->delete();
             $invoice->delete();
 
             DB::commit();

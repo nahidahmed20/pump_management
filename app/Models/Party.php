@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Party extends Model
 {
-    use SoftDeletes;
+    use SoftDeletes, Concerns\BelongsToBranch;
 
     protected $guarded = ['id'];
 

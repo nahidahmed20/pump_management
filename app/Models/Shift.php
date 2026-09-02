@@ -7,13 +7,13 @@ use Illuminate\Database\Eloquent\Model;
 
 class Shift extends Model
 {
-    use HasFactory;
+    use HasFactory, Concerns\BelongsToBranch;
 
     protected $guarded = [];
 
     public function user()
     {
-        return $this->belongsTo(Party::class, 'user_id');
+        return $this->belongsTo(User::class, 'user_id');
     }
 
     public function invoices()

@@ -4,7 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
+use App\Support\BranchDB as DB;
 use Inertia\Inertia;
 
 class TransactionController extends Controller
@@ -62,7 +62,7 @@ class TransactionController extends Controller
     {
         $request->validate([
             'date' => 'required|date',
-            'type' => 'required|in:payment_in,payment_out,transfer,salary,loan_received,loan_repayment',
+            'type' => 'required|in:payment_in,payment_out,transfer,salary',
             'account_id' => 'required|integer|exists:accounts,id',
             'amount' => 'required|numeric|min:1',
             'party_id' => 'nullable|integer|exists:parties,id',
@@ -74,8 +74,12 @@ class TransactionController extends Controller
         try {
             DB::beginTransaction();
 
+            if ($request->type === 'transfer' && (!$request->to_account_id || (int) $request->to_account_id === (int) $request->account_id)) {
+                throw new \Exception('Select a different destination account.');
+            }
+
             $prefix = match($request->type) {
-                'payment_in', 'loan_received' => 'MR-',
+                'payment_in' => 'MR-',
                 'transfer' => 'TR-',
                 default => 'PM-'
             };
@@ -88,7 +92,7 @@ class TransactionController extends Controller
                 throw new \Exception("Account not found.");
             }
 
-            if (in_array($request->type, ['payment_in', 'loan_received'])) {
+            if ($request->type === 'payment_in') {
                 DB::table('accounts')->where('id', $request->account_id)->increment('current_balance', $request->amount);
             } else {
                 if ($account->current_balance < $request->amount) {
@@ -102,10 +106,12 @@ class TransactionController extends Controller
             }
 
             DB::table('transactions')->insert([
+                'branch_id' => auth()->user()->active_branch_id,
                 'voucher_no' => $voucherNo,
                 'date' => $request->date,
                 'type' => $request->type,
                 'account_id' => $request->account_id,
+                'to_account_id' => $request->to_account_id,
                 'party_id' => $request->party_id,
                 'user_id' => $request->user_id,
                 'amount' => $request->amount,
@@ -144,6 +150,10 @@ class TransactionController extends Controller
                 DB::table('accounts')
                     ->where('id', $transaction->account_id)
                     ->increment('current_balance', $transaction->amount);
+            }
+
+            if ($transaction->type === 'transfer' && $transaction->to_account_id) {
+                DB::table('accounts')->where('id', $transaction->to_account_id)->decrement('current_balance', $transaction->amount);
             }
 
             DB::table('transactions')->where('id', $id)->delete();

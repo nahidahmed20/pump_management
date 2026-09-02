@@ -11,7 +11,7 @@ use App\Models\StockLedger;
 use App\Models\Tank;
 use App\Models\Account;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
+use App\Support\BranchDB as DB;
 use Inertia\Inertia;
 
 class PurchaseController extends Controller
@@ -101,6 +101,10 @@ class PurchaseController extends Controller
             }
         }
 
+        if ($totalPaid > (float) $request->grand_total) {
+            return back()->withErrors(['payments' => 'Paid amount cannot exceed purchase total.']);
+        }
+
         // Verify Balance
         foreach ($accountPayments as $accId => $amount) {
             $account = Account::find($accId);
@@ -121,11 +125,11 @@ class PurchaseController extends Controller
             $purchase = Purchase::create([
                 'reference_no' => $final_reference_no,
                 'supplier_id'  => $request->supplier_id,
-                'account_id'   => $primaryAccountId,
                 'sub_total'    => $request->sub_total,
+                'discount'     => $request->discount ?? 0,
                 'grand_total'  => $request->grand_total,
-                'total_amount' => $request->grand_total,
                 'paid_amount'  => $totalPaid,
+                'due_amount'   => $due_amount,
                 'date'         => now(),
             ]);
 
@@ -134,6 +138,7 @@ class PurchaseController extends Controller
                 Account::where('id', $accId)->decrement('current_balance', $amount);
 
                 DB::table('transactions')->insert([
+                    'branch_id'      => auth()->user()->active_branch_id,
                     'voucher_no'     => $purchase->reference_no,
                     'date'           => now(),
                     'type'           => 'payment_out',
@@ -266,6 +271,10 @@ class PurchaseController extends Controller
             }
         }
 
+        if ($totalPaid > (float) $request->grand_total) {
+            return back()->withErrors(['payments' => 'Paid amount cannot exceed purchase total.']);
+        }
+
         $oldAccountPayments = DB::table('transactions')
             ->where('voucher_no', $purchase->reference_no)
             ->where('type', 'payment_out')
@@ -293,7 +302,7 @@ class PurchaseController extends Controller
             DB::table('transactions')->where('voucher_no', $purchase->reference_no)->where('type', 'payment_out')->delete();
 
             // 2. REVERSE OLD DUE
-            $oldDue = max(0, $purchase->total_amount - $purchase->paid_amount);
+            $oldDue = $purchase->due_amount;
             if ($oldDue > 0 && $purchase->supplier_id) {
                 Party::where('id', $purchase->supplier_id)->decrement('current_balance', $oldDue);
             }
@@ -313,11 +322,11 @@ class PurchaseController extends Controller
 
             $purchase->update([
                 'supplier_id'  => $request->supplier_id,
-                'account_id'   => $primaryAccountId,
                 'sub_total'    => $request->sub_total,
+                'discount'     => $request->discount ?? 0,
                 'grand_total'  => $request->grand_total,
-                'total_amount' => $request->grand_total,
                 'paid_amount'  => $totalPaid,
+                'due_amount'   => $newDue,
             ]);
 
             // APPLY NEW PAYMENTS
@@ -325,6 +334,7 @@ class PurchaseController extends Controller
                 Account::where('id', $accId)->decrement('current_balance', $amount);
 
                 DB::table('transactions')->insert([
+                    'branch_id'      => auth()->user()->active_branch_id,
                     'voucher_no'     => $purchase->reference_no,
                     'date'           => now(),
                     'type'           => 'payment_out',
@@ -396,7 +406,7 @@ class PurchaseController extends Controller
                 Account::where('id', $txn->account_id)->increment('current_balance', $txn->amount);
             }
 
-            $dueAmount = max(0, $purchase->total_amount - $purchase->paid_amount);
+            $dueAmount = $purchase->due_amount;
             if ($dueAmount > 0 && $purchase->supplier_id) {
                 Party::where('id', $purchase->supplier_id)->decrement('current_balance', $dueAmount);
             }

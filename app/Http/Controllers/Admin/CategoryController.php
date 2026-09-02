@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Category;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
+use Illuminate\Validation\Rule;
 
 class CategoryController extends Controller
 {
@@ -32,7 +33,7 @@ class CategoryController extends Controller
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'name' => 'required|string|max:255|unique:categories,name',
+            'name' => ['required', 'string', 'max:255', Rule::unique('categories')->where('branch_id', auth()->user()->active_branch_id)],
             'type' => 'required|string|in:fuel,lube,gas,general', // Added 'gas' here
             'is_active' => 'boolean',
         ]);
@@ -45,7 +46,7 @@ class CategoryController extends Controller
     public function update(Request $request, Category $category)
     {
         $validated = $request->validate([
-            'name' => 'required|string|max:255|unique:categories,name,' . $category->id,
+            'name' => ['required', 'string', 'max:255', Rule::unique('categories')->where('branch_id', auth()->user()->active_branch_id)->ignore($category->id)],
             'type' => 'required|string|in:fuel,lube,gas,general', // Added 'gas' here
             'is_active' => 'boolean',
         ]);

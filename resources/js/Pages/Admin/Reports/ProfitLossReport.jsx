@@ -164,13 +164,13 @@ export default function ProfitLossReport({ summary, filters }) {
                             <div className="flex justify-between items-center p-4 rounded-xl bg-slate-50 border border-slate-100 hover:bg-slate-100 hover:border-slate-200 transition-all">
                                 <div>
                                     <p className="text-sm font-bold text-slate-800 flex items-center gap-2">
-                                        <Receipt size={14} className="text-rose-500"/> Total Purchases
+                                        <Receipt size={14} className="text-rose-500"/> Cost of Goods Sold
                                     </p>
                                     <p className="text-xs font-medium text-slate-500 mt-0.5 ml-5">Cost of acquiring inventory</p>
                                 </div>
                                 <span className="text-lg font-black text-rose-600">
                                     <span style={{ fontFamily: 'Arial, sans-serif' }} className="text-rose-400 font-normal mr-1">৳</span>
-                                    {formatMoney(summary.total_purchases)}
+                                    {formatMoney(summary.total_cogs)}
                                 </span>
                             </div>
 

@@ -12,13 +12,14 @@ use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
 use Spatie\Permission\Models\Role;
+use App\Models\Branch;
 
 class UserController extends Controller
 {
     public function index(Request $request): Response
     {
         $users = User::query()
-            ->with('roles:id,name')
+            ->with(['roles:id,name', 'branches:id,name'])
             ->when($request->input('search'), function ($query, $search) {
                 $query->where('name', 'like', "%{$search}%")
                       ->orWhere('email', 'like', "%{$search}%");
@@ -31,12 +32,14 @@ class UserController extends Controller
                 'name'       => $user->name,
                 'email'      => $user->email,
                 'roles'      => $user->roles->pluck('name'),
+                'branch_ids' => $user->branches->pluck('id'),
                 'created_at' => $user->created_at->format('d M, Y'),
             ]);
 
         return Inertia::render('Admin/Users/Index', [
             'users'   => $users,
             'roles'   => Role::pluck('name'),
+            'branches' => Branch::where('is_active', true)->get(['id', 'name', 'code']),
             'filters' => $request->only(['search']),
         ]);
     }
@@ -49,6 +52,8 @@ class UserController extends Controller
             'password' => ['required', 'string', Rules\Password::defaults()],
             'roles'    => ['required', 'array'],
             'roles.*'  => ['string', 'exists:roles,name'],
+            'branch_ids' => ['required', 'array', 'min:1'],
+            'branch_ids.*' => ['integer', 'exists:branches,id'],
         ]);
 
         $user = User::create([
@@ -58,6 +63,8 @@ class UserController extends Controller
         ]);
 
         $user->assignRole($validated['roles']);
+        $user->branches()->sync($validated['branch_ids']);
+        $user->update(['active_branch_id' => $validated['branch_ids'][0]]);
 
         return redirect()->back()->with('success', 'User created successfully!');
     }
@@ -70,6 +77,8 @@ class UserController extends Controller
             'password' => ['nullable', 'string', Rules\Password::defaults()],
             'roles'    => ['required', 'array'],
             'roles.*'  => ['string', 'exists:roles,name'],
+            'branch_ids' => ['required', 'array', 'min:1'],
+            'branch_ids.*' => ['integer', 'exists:branches,id'],
         ]);
 
         $user->name  = $validated['name'];
@@ -82,6 +91,10 @@ class UserController extends Controller
         $user->save();
 
         $user->syncRoles($validated['roles']);
+        $user->branches()->sync($validated['branch_ids']);
+        if (!in_array($user->active_branch_id, $validated['branch_ids'])) {
+            $user->update(['active_branch_id' => $validated['branch_ids'][0]]);
+        }
 
         return redirect()->back()->with('success', 'User updated successfully!');
     }

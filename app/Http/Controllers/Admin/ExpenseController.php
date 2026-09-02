@@ -8,7 +8,7 @@ use App\Models\ExpenseCategory;
 use App\Models\Account;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
-use Illuminate\Support\Facades\DB;
+use App\Support\BranchDB as DB;
 
 class ExpenseController extends Controller
 {
@@ -70,6 +70,7 @@ class ExpenseController extends Controller
                    ->decrement('current_balance', $validated['amount']);
 
             DB::table('transactions')->insert([
+                'branch_id'      => auth()->user()->active_branch_id,
                 'voucher_no'     => 'EXP-' . str_pad($expense->id, 5, '0', STR_PAD_LEFT),
                 'date'           => $expense->date,
                 'type'           => 'payment_out',

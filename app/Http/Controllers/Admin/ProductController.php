@@ -7,6 +7,7 @@ use App\Models\Product;
 use App\Models\Category;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
+use Illuminate\Validation\Rule;
 
 class ProductController extends Controller
 {
@@ -40,7 +41,7 @@ class ProductController extends Controller
     {
         $validated = $request->validate([
             'category_id' => 'required|exists:categories,id',
-            'name' => 'required|string|max:255|unique:products,name',
+            'name' => ['required', 'string', 'max:255', Rule::unique('products')->where('branch_id', auth()->user()->active_branch_id)],
             'unit' => 'required|string|max:50',
             'buying_price' => 'required|numeric|min:0',
             'selling_price' => 'required|numeric|min:0',
@@ -56,7 +57,7 @@ class ProductController extends Controller
     {
         $validated = $request->validate([
             'category_id' => 'required|exists:categories,id',
-            'name' => 'required|string|max:255|unique:products,name,' . $product->id,
+            'name' => ['required', 'string', 'max:255', Rule::unique('products')->where('branch_id', auth()->user()->active_branch_id)->ignore($product->id)],
             'unit' => 'required|string|max:50',
             'buying_price' => 'required|numeric|min:0',
             'selling_price' => 'required|numeric|min:0',
