@@ -356,4 +356,116 @@ class ReportController extends Controller
         ]);
     }
 
+    public function dailyPumpSummary(Request $request)
+    {
+        $date = $request->input('date', date('Y-m-d'));
+        $shiftId = $request->input('shift_id', 'all');
+
+        // 1. Shifts on this date
+        $shifts = \App\Models\Shift::with('user:id,name')
+            ->whereDate('start_time', $date)
+            ->get();
+
+        // 2. Nozzle Readings for this date / shift
+        $nozzleReadingsQuery = \App\Models\NozzleReading::with(['nozzle.tank.product', 'shift.user:id,name'])
+            ->whereDate('created_at', $date);
+        if ($shiftId !== 'all' && !empty($shiftId)) {
+            $nozzleReadingsQuery->where('shift_id', $shiftId);
+        }
+        $nozzleReadings = $nozzleReadingsQuery->get()->map(function ($nr) {
+            $soldQty = max(0, (float)$nr->end_meter - (float)$nr->start_meter - (float)$nr->testing_qty);
+            $totalAmount = $soldQty * (float)$nr->unit_price;
+            return [
+                'id'           => $nr->id,
+                'nozzle_name'  => $nr->nozzle?->name ?? 'Nozzle',
+                'product_name' => $nr->nozzle?->tank?->product?->name ?? 'Fuel',
+                'shift_user'   => $nr->shift?->user?->name ?? 'N/A',
+                'start_meter'  => (float)$nr->start_meter,
+                'end_meter'    => (float)$nr->end_meter,
+                'testing_qty'  => (float)$nr->testing_qty,
+                'sold_qty'     => $soldQty,
+                'unit_price'   => (float)$nr->unit_price,
+                'total_amount' => $totalAmount,
+            ];
+        });
+
+        $totalMeterSales = $nozzleReadings->sum('total_amount');
+        $totalMeterLiters = $nozzleReadings->sum('sold_qty');
+
+        // 3. Invoices on this date
+        $invoicesQuery = \App\Models\Invoice::with(['customer:id,name,phone', 'vehicle:id,vehicle_no'])
+            ->whereDate('date', $date);
+        if ($shiftId !== 'all' && !empty($shiftId)) {
+            $invoicesQuery->where('shift_id', $shiftId);
+        }
+        $invoices = $invoicesQuery->get();
+
+        $invoiceGrossTotal = $invoices->sum('grand_total');
+        $invoicePaid = $invoices->sum('paid_amount');
+        $invoiceDue = $invoices->sum('due_amount');
+        $creditSalesList = $invoices->where('due_amount', '>', 0)->values()->map(function ($inv) {
+            return [
+                'id'            => $inv->id,
+                'invoice_no'    => $inv->invoice_no,
+                'customer_name' => $inv->customer?->name ?? 'Walk-in',
+                'vehicle_no'    => $inv->vehicle_no,
+                'slip_no'       => $inv->slip_no,
+                'grand_total'   => (float)$inv->grand_total,
+                'paid_amount'   => (float)$inv->paid_amount,
+                'due_amount'    => (float)$inv->due_amount,
+            ];
+        });
+
+        // 4. Tank Stocks & Dip Analysis
+        $tanks = \App\Models\Tank::with('product')->get();
+        $tankReadings = \App\Models\TankReading::whereDate('date', $date)->get()->keyBy('tank_id');
+
+        $tankSummary = $tanks->map(function ($tank) use ($tankReadings) {
+            $reading = $tankReadings->get($tank->id);
+            $softwareStock = (float)$tank->current_stock;
+            $physicalStock = $reading ? (float)$reading->physical_stock : null;
+            $variance = $physicalStock !== null ? ($physicalStock - $softwareStock) : null;
+
+            return [
+                'id'             => $tank->id,
+                'tank_name'      => $tank->name,
+                'product_name'   => $tank->product?->name ?? 'Fuel',
+                'capacity'       => (float)$tank->capacity,
+                'software_stock' => $softwareStock,
+                'physical_stock' => $physicalStock,
+                'variance'       => $variance,
+                'dip_note'       => $reading?->note ?? null,
+            ];
+        });
+
+        // 5. Daily Expenses
+        $expenses = \App\Models\Expense::with('category')->whereDate('date', $date)->get();
+        $totalExpense = $expenses->sum('amount');
+
+        // 6. Payments collected
+        $dueCollections = DB::table('payments')->whereDate('date', $date)->where('payment_type', 'due_receive')->sum('amount');
+        $supplierPayments = DB::table('payments')->whereDate('date', $date)->where('payment_type', 'purchase_pay')->sum('amount');
+
+        // 7. Cash In Hand
+        $netCashInHand = ($invoicePaid + $dueCollections) - ($totalExpense + $supplierPayments);
+
+        return Inertia::render('Admin/Reports/DailyPumpSummary', [
+            'date'              => $date,
+            'selectedShiftId'   => $shiftId,
+            'shifts'            => $shifts,
+            'nozzleReadings'    => $nozzleReadings,
+            'totalMeterSales'   => $totalMeterSales,
+            'totalMeterLiters'  => $totalMeterLiters,
+            'invoiceGrossTotal' => $invoiceGrossTotal,
+            'invoicePaid'       => $invoicePaid,
+            'invoiceDue'        => $invoiceDue,
+            'creditSalesList'   => $creditSalesList,
+            'tankSummary'       => $tankSummary,
+            'expenses'          => $expenses,
+            'totalExpense'      => $totalExpense,
+            'dueCollections'    => $dueCollections,
+            'supplierPayments'  => $supplierPayments,
+            'netCashInHand'     => $netCashInHand,
+        ]);
+    }
 }

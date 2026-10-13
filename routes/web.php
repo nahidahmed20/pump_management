@@ -26,6 +26,9 @@ use App\Http\Controllers\Admin\TankReadingController;
 use App\Http\Controllers\Admin\PaymentController;
 use App\Http\Controllers\Admin\BranchController;
 use App\Http\Controllers\Admin\LoanController;
+use App\Http\Controllers\Admin\VehicleController;
+use App\Http\Controllers\Admin\TankDecantationController;
+use App\Http\Controllers\Admin\SmsLogController;
 use App\Http\Controllers\ProfileController;
 use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Route;
@@ -60,13 +63,22 @@ Route::middleware('auth')->group(function () {
         Route::resource('nozzle-readings', NozzleReadingController::class)->middleware('permission:nozzle-readings.manage');
         Route::resource('invoices', InvoiceController::class)->middleware('permission:invoices.manage');
         Route::resource('purchases', PurchaseController::class)->middleware('permission:purchases.manage');
+        Route::get('customers/{customer}/vehicles', [VehicleController::class, 'byCustomer'])->middleware('permission:parties.manage')->name('customers.vehicles');
+        Route::resource('vehicles', VehicleController::class)->middleware('permission:parties.manage');
         Route::resource('parties', PartyController::class)->middleware('permission:parties.manage');
         Route::resource('expenses', ExpenseController::class)->middleware('permission:expenses.manage');
         Route::resource('accounts', AccountController::class)->middleware('permission:accounts.manage');
         Route::resource('transactions', TransactionController::class)->middleware('permission:transactions.manage');
         Route::resource('stock-adjustments', StockAdjustmentController::class)->middleware('permission:stock-adjustments.manage');
         Route::get('settings', [SettingController::class, 'index'])->middleware('permission:settings.manage')->name('settings.index');
-        Route::put('settings', [SettingController::class, 'update'])->middleware('permission:settings.manage')->name('settings.update');
+        Route::match(['put', 'post'], 'settings', [SettingController::class, 'update'])->middleware('permission:settings.manage')->name('settings.update');
+        Route::post('settings/test-sms', [SettingController::class, 'testSms'])->middleware('permission:settings.manage')->name('settings.test-sms');
+
+        Route::resource('tank-decantations', TankDecantationController::class)->middleware('permission:tanks.manage');
+
+        Route::get('sms-logs', [SmsLogController::class, 'index'])->middleware('permission:reports.view')->name('sms-logs.index');
+        Route::post('sms-logs/{smsLog}/resend', [SmsLogController::class, 'resend'])->middleware('permission:reports.view')->name('sms-logs.resend');
+        Route::delete('sms-logs/{smsLog}', [SmsLogController::class, 'destroy'])->middleware('permission:reports.view')->name('sms-logs.destroy');
 
         Route::get('/fuel-prices', [FuelPriceController::class, 'index'])->middleware('permission:fuel-prices.manage')->name('fuel-prices.index');
         Route::post('/fuel-prices', [FuelPriceController::class, 'update'])->middleware('permission:fuel-prices.manage')->name('fuel-prices.update');
@@ -87,6 +99,7 @@ Route::middleware('auth')->group(function () {
             Route::get('/supplier-due', [ReportController::class, 'supplierDueReport'])->name('supplier_due');
             Route::get('/expenses', [ReportController::class, 'expenseReport'])->name('expenses');
             Route::get('/daily-cash', [ReportController::class, 'dailyCashSummary'])->name('daily_cash');
+            Route::get('/daily-pump-summary', [ReportController::class, 'dailyPumpSummary'])->name('daily_pump_summary');
             Route::get('loans', [ReportController::class, 'loanReport'])->name('loans');
             Route::get('/loans/{id}/history', [ReportController::class, 'loanHistory'])->name('loans.history');
         });

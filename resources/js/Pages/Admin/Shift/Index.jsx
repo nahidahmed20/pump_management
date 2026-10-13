@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useForm, router, Link, Head } from "@inertiajs/react";
+import { useForm, router, Link, Head, usePage } from "@inertiajs/react";
 import AdminLayout from "@/Layouts/AdminLayout";
 import Swal from "sweetalert2";
 import {
@@ -9,6 +9,9 @@ import {
 import ConfirmDeleteModal from "@/Components/ConfirmDeleteModal";
 
 export default function ShiftIndex({ shifts, users, filters, errors: serverErrors }) {
+    const { props } = usePage();
+    const currency = props.settings?.currency_symbol || "৳";
+
     const [searchTerm, setSearchTerm] = useState(filters?.search || "");
     const [perPage, setPerPage] = useState(filters?.per_page || 10);
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -260,7 +263,7 @@ export default function ShiftIndex({ shifts, users, filters, errors: serverError
                                 <th className="px-6 py-4 rounded-tl-2xl">Shift ID</th>
                                 <th className="px-6 py-4">Operator / Manager</th>
                                 <th className="px-6 py-4">Timing (Start - End)</th>
-                                <th className="px-6 py-4 text-right">Total Sales (৳)</th>
+                                <th className="px-6 py-4 text-right">Total Sales ({currency})</th>
                                 <th className="px-6 py-4">Status</th>
                                 <th className="px-6 py-4 text-right rounded-tr-2xl print:hidden">Actions</th>
                             </tr>
@@ -290,7 +293,7 @@ export default function ShiftIndex({ shifts, users, filters, errors: serverError
                                             </div>
                                         </td>
                                         <td className="px-6 py-4 text-right font-black text-slate-900 text-base">
-                                            <span style={{ fontFamily: 'Arial, sans-serif' }}>৳</span> {formatMoney(shift.total_sales)}
+                                            <span style={{ fontFamily: 'Arial, sans-serif' }}>{currency}</span> {formatMoney(shift.total_sales)}
                                         </td>
                                         <td className="px-6 py-4">
                                             {shift.status === 'open' ? (

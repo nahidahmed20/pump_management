@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Head, router, Link } from "@inertiajs/react";
+import { Head, router, Link, usePage } from "@inertiajs/react";
 import AdminLayout from "@/Layouts/AdminLayout";
 import {
     ShoppingCart, Calendar, ChevronLeft, ChevronRight,
@@ -7,6 +7,10 @@ import {
 } from "lucide-react";
 
 export default function PurchaseReport({ purchases, summary, filters }) {
+    const { props } = usePage();
+    const settings = props.settings || {};
+    const currency = settings.currency_symbol || "৳";
+
     const [startDate, setStartDate] = useState(filters?.start_date || "");
     const [endDate, setEndDate] = useState(filters?.end_date || "");
     const [perPage, setPerPage] = useState(filters?.per_page || 10);
@@ -75,7 +79,7 @@ export default function PurchaseReport({ purchases, summary, filters }) {
                         <div className="relative z-10">
                             <p className="text-xs font-bold text-violet-500 uppercase tracking-wider mb-1">Total Purchases</p>
                             <h3 className="text-3xl font-black text-slate-800">
-                                <span style={{ fontFamily: 'Arial, sans-serif' }} className="text-slate-400 font-normal mr-1">৳</span>
+                                <span style={{ fontFamily: 'Arial, sans-serif' }} className="text-slate-400 font-normal mr-1">{currency}</span>
                                 {formatMoney(summary.total_purchase)}
                             </h3>
                         </div>
@@ -92,7 +96,7 @@ export default function PurchaseReport({ purchases, summary, filters }) {
                         <div className="relative z-10">
                             <p className="text-xs font-bold text-emerald-500 uppercase tracking-wider mb-1">Total Paid to Suppliers</p>
                             <h3 className="text-3xl font-black text-slate-800">
-                                <span style={{ fontFamily: 'Arial, sans-serif' }} className="text-slate-400 font-normal mr-1">৳</span>
+                                <span style={{ fontFamily: 'Arial, sans-serif' }} className="text-slate-400 font-normal mr-1">{currency}</span>
                                 {formatMoney(summary.total_paid)}
                             </h3>
                         </div>
@@ -109,7 +113,7 @@ export default function PurchaseReport({ purchases, summary, filters }) {
                         <div className="relative z-10">
                             <p className="text-xs font-bold text-rose-500 uppercase tracking-wider mb-1">Total Payable Due</p>
                             <h3 className="text-3xl font-black text-slate-800">
-                                <span style={{ fontFamily: 'Arial, sans-serif' }} className="text-slate-400 font-normal mr-1">৳</span>
+                                <span style={{ fontFamily: 'Arial, sans-serif' }} className="text-slate-400 font-normal mr-1">{currency}</span>
                                 {formatMoney(summary.total_due)}
                             </h3>
                         </div>
@@ -168,8 +172,14 @@ export default function PurchaseReport({ purchases, summary, filters }) {
                 <div className="overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-sm">
                     {/* Print Header */}
                     <div className="hidden print:block p-6 text-center border-b border-slate-200 bg-slate-50">
-                        <h2 className="text-2xl font-black uppercase tracking-widest text-slate-800">Purchase Report</h2>
-                        <p className="text-sm text-slate-500 mt-1 font-medium">
+                        {settings.logo_url && (
+                            <img src={settings.logo_url} alt="Logo" className="h-12 mx-auto mb-2 object-contain" />
+                        )}
+                        <h1 className="text-2xl font-black text-slate-900">{settings.company_name || 'FuelDesk ERP'}</h1>
+                        {settings.company_address && <p className="text-xs text-slate-600">{settings.company_address}</p>}
+                        {settings.company_phone && <p className="text-xs text-slate-600">Phone: {settings.company_phone}</p>}
+                        <h2 className="text-lg font-black uppercase tracking-widest text-slate-800 mt-3">Purchase Report</h2>
+                        <p className="text-sm text-slate-500 mt-0.5 font-medium">
                             {startDate && endDate ? `Showing purchases from ${new Date(startDate).toLocaleDateString('en-GB')} to ${new Date(endDate).toLocaleDateString('en-GB')}` : 'All Time Purchase History'}
                         </p>
                         <p className="text-xs text-slate-400 mt-1">Printed on: {new Date().toLocaleDateString('en-GB')}</p>
@@ -204,23 +214,23 @@ export default function PurchaseReport({ purchases, summary, filters }) {
                                                 </div>
                                             </td>
                                             <td className="px-6 py-4 text-right font-semibold text-slate-600">
-                                                <span style={{ fontFamily: 'Arial, sans-serif' }} className="text-slate-400 font-normal mr-1">৳</span>
+                                                <span style={{ fontFamily: 'Arial, sans-serif' }} className="text-slate-400 font-normal mr-1">{currency}</span>
                                                 {formatMoney(item.sub_total)}
                                             </td>
                                             <td className="px-6 py-4 text-right">
                                                 <span className="inline-flex items-center gap-1.5 px-3 py-1 text-sm font-black text-violet-700 bg-violet-50 rounded-lg border border-violet-100 print:border-none print:bg-transparent print:p-0 print:text-black">
-                                                    <span style={{ fontFamily: 'Arial, sans-serif' }} className="text-violet-400 font-normal print:text-black">৳</span>
+                                                    <span style={{ fontFamily: 'Arial, sans-serif' }} className="text-violet-400 font-normal print:text-black">{currency}</span>
                                                     {formatMoney(item.total_amount)}
                                                 </span>
                                             </td>
                                             <td className="px-6 py-4 text-right font-black text-emerald-600 text-base">
-                                                <span style={{ fontFamily: 'Arial, sans-serif' }} className="text-emerald-400 font-normal mr-1 print:text-black">৳</span>
+                                                <span style={{ fontFamily: 'Arial, sans-serif' }} className="text-emerald-400 font-normal mr-1 print:text-black">{currency}</span>
                                                 {formatMoney(item.paid_amount)}
                                             </td>
                                             <td className="px-6 py-4 text-right font-black text-rose-600 text-base">
                                                 {item.due_amount > 0 ? (
                                                     <>
-                                                        <span style={{ fontFamily: 'Arial, sans-serif' }} className="text-rose-400 font-normal mr-1 print:text-black">৳</span>
+                                                        <span style={{ fontFamily: 'Arial, sans-serif' }} className="text-rose-400 font-normal mr-1 print:text-black">{currency}</span>
                                                         {formatMoney(item.due_amount)}
                                                     </>
                                                 ) : (

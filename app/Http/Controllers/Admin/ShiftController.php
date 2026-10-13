@@ -4,7 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Shift;
-use App\Models\Party;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Carbon\Carbon;
@@ -26,8 +26,8 @@ class ShiftController extends Controller
         $perPage = $request->per_page ?? 10;
         $shifts = $query->latest()->paginate($perPage === 'all' ? 100000 : $perPage)->withQueryString();
 
-        // Fetch staff from parties table
-        $users = Party::where('type', 'staff')->get(['id', 'name', 'phone']);
+        // Fetch operators / managers from users table
+        $users = User::all(['id', 'name', 'email']);
 
         return Inertia::render('Admin/Shift/Index', [
             'shifts'  => $shifts,
@@ -39,7 +39,7 @@ class ShiftController extends Controller
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'user_id'    => 'required|exists:parties,id',
+            'user_id'    => 'required|exists:users,id',
             'start_time' => 'required|date',
         ]);
 
@@ -67,7 +67,7 @@ class ShiftController extends Controller
     public function update(Request $request, Shift $shift)
     {
         $validated = $request->validate([
-            'user_id'    => 'required|exists:parties,id', // parties টেবিল থেকে ভ্যালিডেশন
+            'user_id'    => 'required|exists:users,id',
             'start_time' => 'required|date',
         ]);
 

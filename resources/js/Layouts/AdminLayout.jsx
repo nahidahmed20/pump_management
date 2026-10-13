@@ -26,6 +26,7 @@ const MENU = [
         id: "finance", label: "Accounts & Finance", icon: Wallet, permission: "accounts.manage",
         children: [
             { label: "Parties (Customer/Supplier)", href: "/admin/parties" },
+            { label: "Vehicles & Fleet", href: "/admin/vehicles", permission: "parties.manage" },
             { label: "Accounts (Bank/Cash)", href: "/admin/accounts" },
             { label: "Payments (Receive/Pay)", href: "/admin/payments" },
             { label: "Daily Expenses", href: "/admin/expenses" },
@@ -43,6 +44,7 @@ const MENU = [
     {
         id: "inventory", label: "Inventory & Stock", icon: Boxes, permission: "stock-adjustments.manage",
         children: [
+            { label: "Tank Decantation Log", href: "/admin/tank-decantations", permission: "tanks.manage" },
             { label: "Stock Adjustment", href: "/admin/stock-adjustments" },
         ],
     },
@@ -51,6 +53,7 @@ const MENU = [
         children: [
             { label: "Shift Management", href: "/admin/shifts" },
             { label: "Tank Dip Reading", href: "/admin/tank-readings" },
+            { label: "Tank Decantation Log", href: "/admin/tank-decantations", permission: "tanks.manage" },
             { label: "Nozzle Readings", href: "/admin/nozzle-readings" },
         ],
     },
@@ -64,6 +67,7 @@ const MENU = [
     {
         id: "reports", label: "Reports", icon: BarChart3, permission: "reports.view",
         children: [
+            { label: "Daily Pump Summary (DSR)", href: "/admin/reports/daily-pump-summary" },
             { label: "Daily Cash Report", href: "/admin/reports/daily-cash" },
             { label: "Sales & Revenue", href: "/admin/reports/sales" },
             { label: "Purchase Report", href: "/admin/reports/purchases" },
@@ -73,6 +77,7 @@ const MENU = [
             { label: "Supplier Due", href: "/admin/reports/supplier-due" },
             { label: "Expense Report", href: "/admin/reports/expenses" },
             { label: "Loan Records", href: "/admin/reports/loans" },
+            { label: "SMS History & Logs", href: "/admin/sms-logs" },
         ],
     },
     {
@@ -95,6 +100,7 @@ function cx(...classes) {
 export default function AdminLayout({ children, title, icon: TitleIcon }) {
     const { url, props } = usePage();
     const auth = props.auth || {};
+    const settings = props.settings || {};
     const permissions = auth.permissions || [];
     const isSuperAdmin = (auth.roles || []).includes("Super Admin");
 
@@ -107,6 +113,7 @@ export default function AdminLayout({ children, title, icon: TitleIcon }) {
 
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
     const [userMenuOpen, setUserMenuOpen] = useState(false);
+    const [logoError, setLogoError] = useState(false);
     const userBoxRef = useRef(null);
 
     const hasPermission = (perm) => isSuperAdmin || permissions.includes(perm);
@@ -202,13 +209,24 @@ export default function AdminLayout({ children, title, icon: TitleIcon }) {
                 {/* Brand Header */}
                 <div className="flex h-[72px] shrink-0 items-center justify-between px-5 border-b border-white/[0.04] bg-slate-950/50">
                     <Link href="/dashboard" className="flex items-center gap-3 min-w-0 rounded-lg focus:outline-none">
-                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-amber-400 to-amber-600 shadow-lg shadow-amber-500/20">
-                            <Fuel size={20} className="text-slate-900" strokeWidth={2.5} />
-                        </div>
+                        {settings.logo_url && !logoError ? (
+                            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white p-1 shadow-md shadow-amber-500/20 overflow-hidden">
+                                <img
+                                    src={settings.logo_url}
+                                    alt={settings.company_name || "Logo"}
+                                    onError={() => setLogoError(true)}
+                                    className="max-h-full max-w-full object-contain"
+                                />
+                            </div>
+                        ) : (
+                            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-amber-400 to-amber-600 shadow-lg shadow-amber-500/20">
+                                <Fuel size={22} className="text-slate-900" strokeWidth={2.5} />
+                            </div>
+                        )}
                         {!isSidebarCollapsed && (
                             <div className="min-w-0 flex-1 transition-opacity duration-300">
                                 <p className="truncate text-[15px] font-bold tracking-wide text-white">
-                                    FuelDesk ERP
+                                    {settings.company_name || "FuelDesk ERP"}
                                 </p>
                                 <p className="truncate text-[12px] font-medium text-slate-400">
                                     {auth.user?.active_branch?.name || "Fuel Station"}

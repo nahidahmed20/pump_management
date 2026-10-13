@@ -1,9 +1,12 @@
 import React from "react";
-import { Head, Link } from "@inertiajs/react";
+import { Head, Link, usePage } from "@inertiajs/react";
 import AdminLayout from "@/Layouts/AdminLayout";
-import { Printer, ArrowLeft, Fuel } from "lucide-react";
+import { Printer, ArrowLeft, Fuel, Truck } from "lucide-react";
 
 export default function InvoiceShow({ invoice }) {
+    const { props } = usePage();
+    const settings = props.settings || {};
+    const currency = settings.currency_symbol || "৳";
 
     const handlePrint = () => {
         window.print();
@@ -70,13 +73,30 @@ export default function InvoiceShow({ invoice }) {
                 {/* Header Section */}
                 <div className="flex flex-col sm:flex-row items-center justify-between border-b-2 border-slate-100 pb-6 mb-6">
                     <div className="flex items-center gap-4">
-                        <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-amber-500 text-slate-900 shadow-sm">
-                            <Fuel size={36} />
-                        </div>
+                        {settings.logo_url ? (
+                            <div className="flex h-16 min-w-[64px] max-w-[140px] items-center justify-center rounded-2xl bg-white border border-slate-200 p-1.5 shadow-sm overflow-hidden shrink-0">
+                                <img
+                                    src={settings.logo_url}
+                                    alt={settings.company_name || "Logo"}
+                                    className="max-h-full max-w-full object-contain"
+                                />
+                            </div>
+                        ) : (
+                            <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-amber-500 text-slate-900 shadow-sm shrink-0">
+                                <Fuel size={36} />
+                            </div>
+                        )}
                         <div>
-                            <h1 className="text-2xl font-black uppercase tracking-wider text-slate-900">M/S ABC FILLING STATION</h1>
-                            <p className="text-sm text-slate-500">123 Highway Road, Dhaka, Bangladesh</p>
-                            <p className="text-sm text-slate-500">Phone: +880 1700-000000</p>
+                            <h1 className="text-2xl font-black uppercase tracking-wider text-slate-900">
+                                {settings.company_name || "M/S FILLING STATION"}
+                            </h1>
+                            {settings.company_address && (
+                                <p className="text-sm text-slate-500">{settings.company_address}</p>
+                            )}
+                            <div className="flex flex-wrap items-center gap-x-4 text-sm text-slate-500">
+                                {settings.company_phone && <span>Phone: {settings.company_phone}</span>}
+                                {settings.company_email && <span>Email: {settings.company_email}</span>}
+                            </div>
                         </div>
                     </div>
                     <div className="mt-4 sm:mt-0 text-right">
@@ -97,6 +117,19 @@ export default function InvoiceShow({ invoice }) {
                             </>
                         ) : (
                             <h3 className="text-base font-bold text-slate-800">Walk-in Customer (Cash)</h3>
+                        )}
+                        {(invoice.vehicle_no || invoice.slip_no) && (
+                            <div className="mt-3 p-2.5 rounded-xl bg-slate-50 border border-slate-200/80 text-xs text-slate-700">
+                                <div className="font-bold flex items-center gap-1.5 text-slate-900 mb-1">
+                                    <Truck size={14} className="text-amber-500" />
+                                    <span>Vehicle: {invoice.vehicle_no}</span>
+                                </div>
+                                <div className="grid grid-cols-2 gap-x-4 gap-y-0.5 text-[11px] text-slate-600">
+                                    {invoice.slip_no && <div><span className="font-semibold text-slate-500">Slip No:</span> {invoice.slip_no}</div>}
+                                    {invoice.odometer_km && <div><span className="font-semibold text-slate-500">Odometer:</span> {Number(invoice.odometer_km).toLocaleString()} KM</div>}
+                                    {invoice.driver_name && <div><span className="font-semibold text-slate-500">Driver:</span> {invoice.driver_name}</div>}
+                                </div>
+                            </div>
                         )}
                     </div>
                     <div className="text-right">
@@ -135,10 +168,10 @@ export default function InvoiceShow({ invoice }) {
                                         {Number(item.quantity).toFixed(2)} {item.product?.unit}
                                     </td>
                                     <td className="px-5 py-4 text-right text-slate-600 font-semibold">
-                                        <span style={{ fontFamily: 'Arial, sans-serif' }}>৳</span> {formatMoney(item.unit_price)}
+                                        <span style={{ fontFamily: 'Arial, sans-serif' }}>{currency}</span> {formatMoney(item.unit_price)}
                                     </td>
                                     <td className="px-5 py-4 text-right font-black text-slate-900">
-                                        <span style={{ fontFamily: 'Arial, sans-serif' }}>৳</span> {formatMoney(item.total_price)}
+                                        <span style={{ fontFamily: 'Arial, sans-serif' }}>{currency}</span> {formatMoney(item.total_price)}
                                     </td>
                                 </tr>
                             ))}
@@ -151,36 +184,44 @@ export default function InvoiceShow({ invoice }) {
                     <div className="w-full max-w-sm rounded-2xl border border-slate-100 bg-slate-50/50 p-5 space-y-2.5 shadow-sm">
                         <div className="flex justify-between text-sm text-slate-600">
                             <span className="font-semibold">Subtotal:</span>
-                            <span className="font-bold text-slate-700"><span style={{ fontFamily: 'Arial, sans-serif' }}>৳</span> {formatMoney(invoice.sub_total)}</span>
+                            <span className="font-bold text-slate-700"><span style={{ fontFamily: 'Arial, sans-serif' }}>{currency}</span> {formatMoney(invoice.sub_total)}</span>
                         </div>
                         {Number(invoice.discount) > 0 && (
                             <div className="flex justify-between text-sm text-slate-600 border-b border-slate-200 pb-2.5">
                                 <span className="font-semibold">Discount:</span>
-                                <span className="font-bold text-rose-500">- <span style={{ fontFamily: 'Arial, sans-serif' }}>৳</span> {formatMoney(invoice.discount)}</span>
+                                <span className="font-bold text-rose-500">- <span style={{ fontFamily: 'Arial, sans-serif' }}>{currency}</span> {formatMoney(invoice.discount)}</span>
                             </div>
                         )}
                         <div className="flex justify-between pt-1 text-base font-bold text-slate-800">
                             <span>Grand Total:</span>
-                            <span className="text-lg font-black text-slate-900"><span style={{ fontFamily: 'Arial, sans-serif' }}>৳</span> {formatMoney(invoice.grand_total)}</span>
+                            <span className="text-lg font-black text-slate-900"><span style={{ fontFamily: 'Arial, sans-serif' }}>{currency}</span> {formatMoney(invoice.grand_total)}</span>
                         </div>
 
                         <div className="flex justify-between text-sm font-bold text-emerald-600 pt-1">
                             <span>Paid Amount:</span>
-                            <span><span style={{ fontFamily: 'Arial, sans-serif' }}>৳</span> {formatMoney(invoice.paid_amount)}</span>
+                            <span><span style={{ fontFamily: 'Arial, sans-serif' }}>{currency}</span> {formatMoney(invoice.paid_amount)}</span>
                         </div>
                         {Number(invoice.due_amount) > 0 && (
                             <div className="flex justify-between text-sm font-bold text-rose-600 pt-1">
                                 <span>Due Amount:</span>
-                                <span><span style={{ fontFamily: 'Arial, sans-serif' }}>৳</span> {formatMoney(invoice.due_amount)}</span>
+                                <span><span style={{ fontFamily: 'Arial, sans-serif' }}>{currency}</span> {formatMoney(invoice.due_amount)}</span>
                             </div>
                         )}
                     </div>
                 </div>
 
-                {/* Footer Notes */}
-                <div className="border-t border-slate-200 pt-6 text-center">
-                    <p className="font-bold text-slate-800 text-base mb-1">Thank You For Your Business!</p>
-                    <p className="text-xs text-slate-400">Goods once sold cannot be returned. If you have any questions concerning this invoice, please contact our support.</p>
+                {/* Footer Notes & Terms */}
+                <div className="border-t border-slate-200 pt-5 text-center space-y-1">
+                    <p className="font-bold text-slate-800 text-sm">
+                        {settings.receipt_footer || "Thank You For Your Business!"}
+                    </p>
+                    {settings.invoice_terms ? (
+                        <p className="text-xs text-slate-500 max-w-xl mx-auto whitespace-pre-line">
+                            {settings.invoice_terms}
+                        </p>
+                    ) : (
+                        <p className="text-xs text-slate-400">Goods once sold cannot be returned. Please check fuel quantity before leaving.</p>
+                    )}
                 </div>
 
                 {/* Signature Section */}

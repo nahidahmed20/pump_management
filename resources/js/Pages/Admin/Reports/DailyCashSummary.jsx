@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { Head, router } from "@inertiajs/react";
+import { Head, router, usePage } from "@inertiajs/react";
 import AdminLayout from "@/Layouts/AdminLayout";
 import {
     Wallet, Calendar, ChevronLeft, ChevronRight,
@@ -7,6 +7,10 @@ import {
 } from "lucide-react";
 
 export default function DailyCashSummary({ summary, prevDate, nextDate, filters }) {
+    const { props } = usePage();
+    const settings = props.settings || {};
+    const currency = settings.currency_symbol || "৳";
+
     const goToDate = (newDate) => {
         router.get("/admin/reports/daily-cash", { date: newDate }, { preserveState: true, replace: true });
     };
@@ -72,7 +76,7 @@ export default function DailyCashSummary({ summary, prevDate, nextDate, filters 
                         <div className="relative z-10">
                             <p className="text-xs font-bold text-emerald-500 uppercase tracking-wider mb-1">Total Cash In</p>
                             <h3 className="text-2xl font-black text-slate-800">
-                                <span style={{ fontFamily: 'Arial, sans-serif' }} className="text-slate-400 font-normal mr-1">৳</span>
+                                <span style={{ fontFamily: 'Arial, sans-serif' }} className="text-slate-400 font-normal mr-1">{currency}</span>
                                 {formatMoney(cashIn)}
                             </h3>
                         </div>
@@ -89,7 +93,7 @@ export default function DailyCashSummary({ summary, prevDate, nextDate, filters 
                         <div className="relative z-10">
                             <p className="text-xs font-bold text-rose-500 uppercase tracking-wider mb-1">Total Cash Out</p>
                             <h3 className="text-2xl font-black text-slate-800">
-                                <span style={{ fontFamily: 'Arial, sans-serif' }} className="text-slate-400 font-normal mr-1">৳</span>
+                                <span style={{ fontFamily: 'Arial, sans-serif' }} className="text-slate-400 font-normal mr-1">{currency}</span>
                                 {formatMoney(cashOut)}
                             </h3>
                         </div>
@@ -106,7 +110,7 @@ export default function DailyCashSummary({ summary, prevDate, nextDate, filters 
                         <div className="relative z-10">
                             <p className="text-xs font-bold text-blue-500 uppercase tracking-wider mb-1">Net Cash in Hand</p>
                             <h3 className="text-2xl font-black text-slate-800">
-                                <span style={{ fontFamily: 'Arial, sans-serif' }} className="text-slate-400 font-normal mr-1">৳</span>
+                                <span style={{ fontFamily: 'Arial, sans-serif' }} className="text-slate-400 font-normal mr-1">{currency}</span>
                                 {formatMoney(summary.net_cash)}
                             </h3>
                         </div>
@@ -121,8 +125,14 @@ export default function DailyCashSummary({ summary, prevDate, nextDate, filters 
                 <div className="overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-sm">
                     {/* Print Header */}
                     <div className="hidden print:block p-6 text-center border-b border-slate-200 bg-slate-50">
-                        <h2 className="text-2xl font-black uppercase tracking-widest text-slate-800">Daily Cash Summary</h2>
-                        <p className="text-sm text-slate-500 mt-1 font-medium">For Date: {new Date(summary.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
+                        {settings.logo_url && (
+                            <img src={settings.logo_url} alt="Logo" className="h-12 mx-auto mb-2 object-contain" />
+                        )}
+                        <h1 className="text-2xl font-black text-slate-900">{settings.company_name || 'FuelDesk ERP'}</h1>
+                        {settings.company_address && <p className="text-xs text-slate-600">{settings.company_address}</p>}
+                        {settings.company_phone && <p className="text-xs text-slate-600">Phone: {settings.company_phone}</p>}
+                        <h2 className="text-lg font-black uppercase tracking-widest text-slate-800 mt-3">Daily Cash Summary</h2>
+                        <p className="text-sm text-slate-500 mt-0.5 font-medium">For Date: {new Date(summary.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
                     </div>
 
                     <div className="overflow-x-auto">
@@ -146,7 +156,7 @@ export default function DailyCashSummary({ summary, prevDate, nextDate, filters 
                                         </div>
                                     </td>
                                     <td className="px-6 py-5 text-right font-black text-emerald-600 text-base">
-                                        <span style={{ fontFamily: 'Arial, sans-serif' }} className="text-emerald-300 font-normal mr-1 print:text-black">৳</span>
+                                        <span style={{ fontFamily: 'Arial, sans-serif' }} className="text-emerald-500 font-normal mr-1 print:text-black">{currency}</span>
                                         {formatMoney(summary.cash_sales)}
                                     </td>
                                 </tr>
@@ -160,7 +170,7 @@ export default function DailyCashSummary({ summary, prevDate, nextDate, filters 
                                         </div>
                                     </td>
                                     <td className="px-6 py-5 text-right font-black text-emerald-600 text-base">
-                                        <span style={{ fontFamily: 'Arial, sans-serif' }} className="text-emerald-300 font-normal mr-1 print:text-black">৳</span>
+                                        <span style={{ fontFamily: 'Arial, sans-serif' }} className="text-emerald-500 font-normal mr-1 print:text-black">{currency}</span>
                                         {formatMoney(summary.collections)}
                                     </td>
                                 </tr>
@@ -176,7 +186,7 @@ export default function DailyCashSummary({ summary, prevDate, nextDate, filters 
                                         </div>
                                     </td>
                                     <td className="px-6 py-5 text-right font-black text-rose-600 text-base">
-                                        <span style={{ fontFamily: 'Arial, sans-serif' }} className="text-rose-300 font-normal mr-1 print:text-black">৳</span>
+                                        <span style={{ fontFamily: 'Arial, sans-serif' }} className="text-rose-500 font-normal mr-1 print:text-black">{currency}</span>
                                         {formatMoney(summary.expenses)}
                                     </td>
                                 </tr>
@@ -190,7 +200,7 @@ export default function DailyCashSummary({ summary, prevDate, nextDate, filters 
                                         </div>
                                     </td>
                                     <td className="px-6 py-5 text-right font-black text-rose-600 text-base">
-                                        <span style={{ fontFamily: 'Arial, sans-serif' }} className="text-rose-300 font-normal mr-1 print:text-black">৳</span>
+                                        <span style={{ fontFamily: 'Arial, sans-serif' }} className="text-rose-500 font-normal mr-1 print:text-black">{currency}</span>
                                         {formatMoney(summary.supplier_payments)}
                                     </td>
                                 </tr>
@@ -202,7 +212,7 @@ export default function DailyCashSummary({ summary, prevDate, nextDate, filters 
                                         Total Cash Balance
                                     </td>
                                     <td className="px-6 py-5 text-right text-xl font-black text-blue-700 print:text-black">
-                                        <span style={{ fontFamily: 'Arial, sans-serif' }} className="text-blue-400 font-normal mr-1 print:text-black">৳</span>
+                                        <span style={{ fontFamily: 'Arial, sans-serif' }} className="text-blue-500 font-normal mr-1 print:text-black">{currency}</span>
                                         {formatMoney(summary.net_cash)}
                                     </td>
                                 </tr>

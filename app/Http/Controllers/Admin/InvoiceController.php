@@ -11,6 +11,7 @@ use App\Models\Shift;
 use App\Models\StockLedger;
 use App\Models\Tank;
 use App\Models\Account;
+use App\Models\Vehicle;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use App\Support\BranchDB as DB;
@@ -22,14 +23,18 @@ class InvoiceController extends Controller
 {
     public function index(Request $request)
     {
-        $query = Invoice::with(['customer', 'shift.user']);
+        $query = Invoice::with(['customer', 'vehicle', 'shift.user']);
 
         if ($request->has('search') && $request->search != '') {
             $search = $request->search;
-            $query->where('invoice_no', 'like', '%' . $search . '%')
-                  ->orWhereHas('customer', function ($q) use ($search) {
-                      $q->where('name', 'like', '%' . $search . '%');
+            $query->where(function ($q) use ($search) {
+                $q->where('invoice_no', 'like', '%' . $search . '%')
+                  ->orWhere('vehicle_no', 'like', '%' . $search . '%')
+                  ->orWhere('slip_no', 'like', '%' . $search . '%')
+                  ->orWhereHas('customer', function ($cq) use ($search) {
+                      $cq->where('name', 'like', '%' . $search . '%');
                   });
+            });
         }
 
         $perPage = $request->per_page === 'all' ? 100000 : ($request->per_page ?? 10);
@@ -45,6 +50,7 @@ class InvoiceController extends Controller
     {
         $openShift = Shift::where('status', 'open')->first();
         $customers = Party::where('type', 'customer')->get(['id', 'name', 'phone']);
+        $vehicles  = Vehicle::where('is_active', true)->get(['id', 'party_id', 'vehicle_no', 'vehicle_type', 'driver_name', 'driver_phone']);
         $products  = Product::where('is_active', true)->with('category')->get();
         $accounts  = Account::get(['id', 'name', 'type']);
 
@@ -55,6 +61,7 @@ class InvoiceController extends Controller
         return Inertia::render('Admin/Invoice/Create', [
             'openShift'  => $openShift,
             'customers'  => $customers,
+            'vehicles'   => $vehicles,
             'products'   => $products,
             'accounts'   => $accounts,
             'invoice_no' => $invoice_no,
@@ -65,6 +72,11 @@ class InvoiceController extends Controller
     {
         $request->validate([
             'customer_id'           => 'nullable|exists:parties,id',
+            'vehicle_id'            => 'nullable|exists:vehicles,id',
+            'vehicle_no'            => 'nullable|string|max:100',
+            'slip_no'               => 'nullable|string|max:100',
+            'odometer_km'           => 'nullable|numeric|min:0',
+            'driver_name'           => 'nullable|string|max:100',
             'sub_total'             => 'required|numeric|min:0',
             'discount'              => 'nullable|numeric|min:0',
             'grand_total'           => 'required|numeric|min:0',
@@ -141,15 +153,20 @@ class InvoiceController extends Controller
             }
 
             $invoice = Invoice::create([
-                'invoice_no'  => $final_invoice_no,
-                'customer_id' => $request->customer_id,
-                'shift_id'    => $openShift ? $openShift->id : null,
-                'sub_total'   => $request->sub_total,
-                'discount'    => $request->discount ?? 0,
-                'grand_total' => $request->grand_total,
-                'paid_amount' => $totalPaid,
-                'due_amount'  => $due_amount,
-                'date'        => now(),
+                'invoice_no'   => $final_invoice_no,
+                'customer_id'  => $request->customer_id,
+                'vehicle_id'   => $request->vehicle_id,
+                'vehicle_no'   => $request->vehicle_no,
+                'slip_no'      => $request->slip_no,
+                'odometer_km'  => $request->odometer_km,
+                'driver_name'  => $request->driver_name,
+                'shift_id'     => $openShift ? $openShift->id : null,
+                'sub_total'    => $request->sub_total,
+                'discount'     => $request->discount ?? 0,
+                'grand_total'  => $request->grand_total,
+                'paid_amount'  => $totalPaid,
+                'due_amount'   => $due_amount,
+                'date'         => now(),
             ]);
 
             // Insert Split Payments & Increase Account Balances
@@ -183,6 +200,12 @@ class InvoiceController extends Controller
             }
 
             DB::commit();
+
+            // Trigger SMS Notification for credit fueling / invoice
+            if ($invoice->customer_id) {
+                \App\Services\SmsService::sendCreditSaleNotification($invoice);
+            }
+
             return redirect()->route('admin.invoices.index')->with('success', 'Sale completed successfully.');
 
         } catch (\Exception $e) {
@@ -194,7 +217,7 @@ class InvoiceController extends Controller
 
     public function show($id)
     {
-        $invoice = Invoice::with(['customer', 'items.product', 'shift.user'])->findOrFail($id);
+        $invoice = Invoice::with(['customer', 'vehicle', 'items.product', 'shift.user'])->findOrFail($id);
 
         return Inertia::render('Admin/Invoice/Show', [
             'invoice' => $invoice,

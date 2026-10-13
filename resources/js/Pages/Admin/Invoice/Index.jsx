@@ -4,7 +4,7 @@ import AdminLayout from "@/Layouts/AdminLayout";
 import Swal from "sweetalert2";
 import ConfirmDeleteModal from "@/Components/ConfirmDeleteModal";
 import {
-    Plus, Search, FileText, Trash2, Edit, ChevronLeft, ChevronRight, ShoppingCart
+    Plus, Search, FileText, Trash2, Edit, ChevronLeft, ChevronRight, ShoppingCart, Truck
 } from "lucide-react";
 
 export default function InvoiceIndex({ invoices, filters }) {
@@ -133,8 +133,21 @@ export default function InvoiceIndex({ invoices, filters }) {
                                                     <div className="text-[10px] font-bold bg-slate-100 text-slate-500 px-2 py-0.5 rounded-md mt-1 inline-block border border-slate-200">Shift #{invoice.shift_id}</div>
                                                 )}
                                             </td>
-                                            <td className="px-6 py-4 font-bold text-slate-800">
-                                                {invoice.customer ? invoice.customer.name : <span className="text-slate-400 italic font-medium">Walk-in Customer</span>}
+                                            <td className="px-6 py-4">
+                                                <div className="font-bold text-slate-800">
+                                                    {invoice.customer ? invoice.customer.name : <span className="text-slate-400 italic font-medium">Walk-in Customer</span>}
+                                                </div>
+                                                {invoice.vehicle_no && (
+                                                    <div className="text-xs font-semibold text-slate-600 flex items-center gap-1 mt-1">
+                                                        <Truck size={12} className="text-amber-500 shrink-0" />
+                                                        <span>{invoice.vehicle_no}</span>
+                                                        {invoice.slip_no && (
+                                                            <span className="text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.2 rounded border border-slate-200">
+                                                                Slip: {invoice.slip_no}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                )}
                                             </td>
                                             <td className="px-6 py-4 text-center">
                                                 <span className={`inline-flex items-center px-2.5 py-1 rounded-md text-[10px] font-bold uppercase border ${statusClasses}`}>

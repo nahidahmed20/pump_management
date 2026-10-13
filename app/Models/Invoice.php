@@ -17,6 +17,12 @@ class Invoice extends Model
         return $this->belongsTo(Party::class, 'customer_id');
     }
 
+    // Vehicle Relationship
+    public function vehicle()
+    {
+        return $this->belongsTo(Vehicle::class, 'vehicle_id');
+    }
+
     // Shift Relationship
     public function shift()
     {
