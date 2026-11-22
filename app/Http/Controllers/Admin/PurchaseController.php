@@ -11,6 +11,7 @@ use App\Models\StockLedger;
 use App\Models\Tank;
 use App\Models\Account;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use App\Support\BranchDB as DB;
 use Inertia\Inertia;
 
@@ -61,21 +62,31 @@ class PurchaseController extends Controller
 
     public function store(Request $request)
     {
+        $branchId = $request->user()->active_branch_id;
         $request->validate([
-            'supplier_id'           => 'required|exists:parties,id',
+            'supplier_id'           => ['required', Rule::exists('parties', 'id')->where(fn ($query) => $query->where('branch_id', $branchId)->where('type', 'supplier')->whereNull('deleted_at'))],
             'sub_total'             => 'required|numeric|min:0',
             'discount'              => 'nullable|numeric|min:0',
             'grand_total'           => 'required|numeric|min:0',
             'cart'                  => 'required|array|min:1',
-            'cart.*.id'             => 'required|exists:products,id',
+            'cart.*.id'             => ['required', Rule::exists('products', 'id')->where('branch_id', $branchId)->whereNull('deleted_at')],
             'cart.*.quantity'       => 'required|numeric|gt:0',
             'cart.*.unit_price'     => 'required|numeric|min:0',
-            'cart.*.total_price'    => 'required|numeric|min:0',
-            'cart.*.tank_id'        => 'nullable|exists:tanks,id',
+            'cart.*.tank_id'        => ['nullable', Rule::exists('tanks', 'id')->where('branch_id', $branchId)->whereNull('deleted_at')],
             'payments'              => 'required|array',
-            'payments.*.account_id' => 'nullable|exists:accounts,id',
+            'payments.*.account_id' => ['nullable', Rule::exists('accounts', 'id')->where('branch_id', $branchId)->whereNull('deleted_at')],
             'payments.*.amount'     => 'nullable|numeric|min:0',
         ]);
+
+        foreach ($request->cart as $index => $item) {
+            if (!empty($item['tank_id']) && !Tank::whereKey($item['tank_id'])->where('product_id', $item['id'])->exists()) {
+                return back()->withErrors(["cart.{$index}.tank_id" => 'The selected tank does not store this product.']);
+            }
+        }
+
+        $serverSubTotal = collect($request->cart)->sum(fn ($item) => round((float) $item['quantity'] * (float) $item['unit_price'], 3));
+        $serverDiscount = min((float) ($request->discount ?? 0), $serverSubTotal);
+        $request->merge(['sub_total' => $serverSubTotal, 'discount' => $serverDiscount, 'grand_total' => $serverSubTotal - $serverDiscount]);
 
         // Process payments array and check account balances
         $accountPayments = [];
@@ -108,6 +119,9 @@ class PurchaseController extends Controller
         // Verify Balance
         foreach ($accountPayments as $accId => $amount) {
             $account = Account::find($accId);
+            if (!$account) {
+                return back()->withErrors(['account_id' => 'The selected account is not available in this branch.']);
+            }
             if ($account && $account->current_balance < $amount) {
                 return redirect()->back()->withErrors(['account_id' => 'Insufficient balance in ' . $account->name . '! Available: ৳' . number_format($account->current_balance, 2)]);
             }
@@ -165,7 +179,7 @@ class PurchaseController extends Controller
                     'tank_id'     => $tankId,
                     'quantity'    => $item['quantity'],
                     'unit_price'  => $item['unit_price'],
-                    'total_price' => $item['total_price'],
+                    'total_price' => round((float) $item['quantity'] * (float) $item['unit_price'], 3),
                 ]);
 
                 Product::where('id', $item['id'])->increment('current_stock', $item['quantity']);
@@ -233,21 +247,31 @@ class PurchaseController extends Controller
 
     public function update(Request $request, $id)
     {
+        $branchId = $request->user()->active_branch_id;
         $request->validate([
-            'supplier_id'           => 'required|exists:parties,id',
+            'supplier_id'           => ['required', Rule::exists('parties', 'id')->where(fn ($query) => $query->where('branch_id', $branchId)->where('type', 'supplier')->whereNull('deleted_at'))],
             'sub_total'             => 'required|numeric|min:0',
             'discount'              => 'nullable|numeric|min:0',
             'grand_total'           => 'required|numeric|min:0',
             'cart'                  => 'required|array|min:1',
-            'cart.*.id'             => 'required|exists:products,id',
+            'cart.*.id'             => ['required', Rule::exists('products', 'id')->where('branch_id', $branchId)->whereNull('deleted_at')],
             'cart.*.quantity'       => 'required|numeric|gt:0',
             'cart.*.unit_price'     => 'required|numeric|min:0',
-            'cart.*.total_price'    => 'required|numeric|min:0',
-            'cart.*.tank_id'        => 'nullable|exists:tanks,id',
+            'cart.*.tank_id'        => ['nullable', Rule::exists('tanks', 'id')->where('branch_id', $branchId)->whereNull('deleted_at')],
             'payments'              => 'required|array',
-            'payments.*.account_id' => 'nullable|exists:accounts,id',
+            'payments.*.account_id' => ['nullable', Rule::exists('accounts', 'id')->where('branch_id', $branchId)->whereNull('deleted_at')],
             'payments.*.amount'     => 'nullable|numeric|min:0',
         ]);
+
+        foreach ($request->cart as $index => $item) {
+            if (!empty($item['tank_id']) && !Tank::whereKey($item['tank_id'])->where('product_id', $item['id'])->exists()) {
+                return back()->withErrors(["cart.{$index}.tank_id" => 'The selected tank does not store this product.']);
+            }
+        }
+
+        $serverSubTotal = collect($request->cart)->sum(fn ($item) => round((float) $item['quantity'] * (float) $item['unit_price'], 3));
+        $serverDiscount = min((float) ($request->discount ?? 0), $serverSubTotal);
+        $request->merge(['sub_total' => $serverSubTotal, 'discount' => $serverDiscount, 'grand_total' => $serverSubTotal - $serverDiscount]);
 
         $purchase = Purchase::with('items')->findOrFail($id);
 
@@ -284,6 +308,9 @@ class PurchaseController extends Controller
 
         foreach ($newAccountPayments as $accId => $amount) {
             $account = Account::find($accId);
+            if (!$account) {
+                return back()->withErrors(['account_id' => 'The selected account is not available in this branch.']);
+            }
             $restoredAmount = $oldAccountPayments[$accId] ?? 0;
             $available = $account->current_balance + $restoredAmount;
 
@@ -363,7 +390,7 @@ class PurchaseController extends Controller
                     'tank_id'     => $tankId,
                     'quantity'    => $item['quantity'],
                     'unit_price'  => $item['unit_price'],
-                    'total_price' => $item['total_price'],
+                    'total_price' => round((float) $item['quantity'] * (float) $item['unit_price'], 3),
                 ]);
 
                 Product::where('id', $item['id'])->increment('current_stock', $item['quantity']);

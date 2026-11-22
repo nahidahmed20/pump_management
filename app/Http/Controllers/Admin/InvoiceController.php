@@ -14,6 +14,7 @@ use App\Models\Account;
 use App\Models\Vehicle;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use App\Support\BranchDB as DB;
 use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
@@ -70,9 +71,10 @@ class InvoiceController extends Controller
 
     public function store(Request $request)
     {
+        $branchId = $request->user()->active_branch_id;
         $request->validate([
-            'customer_id'           => 'nullable|exists:parties,id',
-            'vehicle_id'            => 'nullable|exists:vehicles,id',
+            'customer_id'           => ['nullable', Rule::exists('parties', 'id')->where(fn ($query) => $query->where('branch_id', $branchId)->where('type', 'customer')->whereNull('deleted_at'))],
+            'vehicle_id'            => ['nullable', Rule::exists('vehicles', 'id')->where(fn ($query) => $query->where('branch_id', $branchId)->where('party_id', $request->input('customer_id'))->whereNull('deleted_at'))],
             'vehicle_no'            => 'nullable|string|max:100',
             'slip_no'               => 'nullable|string|max:100',
             'odometer_km'           => 'nullable|numeric|min:0',
@@ -81,11 +83,11 @@ class InvoiceController extends Controller
             'discount'              => 'nullable|numeric|min:0',
             'grand_total'           => 'required|numeric|min:0',
             'cart'                  => 'required|array|min:1',
-            'cart.*.id'             => 'required|integer|exists:products,id',
+            'cart.*.id'             => ['required', 'integer', Rule::exists('products', 'id')->where('branch_id', $branchId)->whereNull('deleted_at')],
             'cart.*.quantity'       => 'required|numeric|gt:0',
             'cart.*.unit_price'     => 'required|numeric|min:0',
             'payments'              => 'required|array',
-            'payments.*.account_id' => 'nullable|exists:accounts,id',
+            'payments.*.account_id' => ['nullable', Rule::exists('accounts', 'id')->where('branch_id', $branchId)->whereNull('deleted_at')],
             'payments.*.amount'     => 'nullable|numeric|min:0',
         ]);
 
@@ -251,17 +253,18 @@ class InvoiceController extends Controller
 
     public function update(Request $request, $id)
     {
+        $branchId = $request->user()->active_branch_id;
         $request->validate([
-            'customer_id'           => 'nullable|exists:parties,id',
+            'customer_id'           => ['nullable', Rule::exists('parties', 'id')->where(fn ($query) => $query->where('branch_id', $branchId)->where('type', 'customer')->whereNull('deleted_at'))],
             'sub_total'             => 'required|numeric|min:0',
             'discount'              => 'nullable|numeric|min:0',
             'grand_total'           => 'required|numeric|min:0',
             'cart'                  => 'required|array|min:1',
-            'cart.*.id'             => 'required|integer|exists:products,id',
+            'cart.*.id'             => ['required', 'integer', Rule::exists('products', 'id')->where('branch_id', $branchId)->whereNull('deleted_at')],
             'cart.*.quantity'       => 'required|numeric|gt:0',
             'cart.*.unit_price'     => 'required|numeric|min:0',
             'payments'              => 'required|array',
-            'payments.*.account_id' => 'nullable|exists:accounts,id',
+            'payments.*.account_id' => ['nullable', Rule::exists('accounts', 'id')->where('branch_id', $branchId)->whereNull('deleted_at')],
             'payments.*.amount'     => 'nullable|numeric|min:0',
         ]);
 
@@ -287,6 +290,14 @@ class InvoiceController extends Controller
                 $newAccountPayments[$accId] += $amt;
                 $totalPaid += $amt;
             }
+        }
+
+        if ($totalPaid > (float) $request->grand_total) {
+            return back()->withErrors(['payments' => 'Paid amount cannot exceed invoice total.']);
+        }
+
+        if ($totalPaid < (float) $request->grand_total && !$request->customer_id) {
+            return back()->withErrors(['customer_id' => 'A customer is required for a credit sale.']);
         }
 
         try {
